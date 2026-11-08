@@ -191,6 +191,24 @@ describe('ConversationService', () => {
     expect(whatsapp.sendText).toHaveBeenCalledWith('15551230000', COPY.cancelled);
   });
 
+  it('deletes the account when the sender asks', async () => {
+    const findMany = jest.fn(async () => [
+      { id: 'post_9', sourceMessageId: 'wamid.9', revisionMessageId: null },
+    ]);
+    const deleteMany = jest.fn(async () => ({ count: 1 }));
+    const remove = jest.fn(async () => ({ id: 'user_1' }));
+    Object.assign(prisma, {
+      post: { findMany },
+      webhookEvent: { deleteMany },
+      user: { ...prisma.user, delete: remove },
+    });
+    await service.handle(text('wamid.9', 'Delete my data.'));
+    expect(deleteMany).toHaveBeenCalledWith({ where: { waMessageId: { in: ['wamid.9'] } } });
+    expect(remove).toHaveBeenCalledWith({ where: { id: 'user_1' } });
+    expect(generateQueue.add).not.toHaveBeenCalled();
+    expect(whatsapp.sendText).toHaveBeenCalledWith('15551230000', COPY.deleted);
+  });
+
   it('tells the user when the brand row is missing', async () => {
     brands.findFirst.mockResolvedValue(null);
     await service.handle(text('wamid.1', '20% off whitening'));

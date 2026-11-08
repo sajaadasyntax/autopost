@@ -9,6 +9,7 @@ import { DesignModule } from './design/design.module';
 import { DevModule } from './dev/dev.module';
 import { OutboxModule } from './dev/outbox.module';
 import { HealthModule } from './health/health.module';
+import { LegalModule } from './legal/legal.module';
 import { PostsModule } from './posts/posts.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PublishingModule } from './publishing/publishing.module';
@@ -34,6 +35,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     ConversationModule,
     DevModule,
     HealthModule,
+    LegalModule,
   ],
   providers: [LocalWorkers],
 })

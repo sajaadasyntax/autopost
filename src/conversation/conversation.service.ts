@@ -1,3 +1,5 @@
+import { unlink } from 'fs/promises';
+import { join, resolve } from 'path';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Conversation, ConversationState, PostStatus, User } from '@prisma/client';
 import { normalizePhone } from '../common/phones';
@@ -58,6 +60,11 @@ export class ConversationService {
 
   private async handleText(user: User, conversation: Conversation, message: IncomingMessage): Promise<void> {
     const text = message.text!.trim();
+    if (isDataDeletionRequest(text)) {
+      await this.deleteAccount(user);
+      await this.whatsapp.sendText(user.phone, COPY.deleted);
+      return;
+    }
     switch (conversation.state) {
       case ConversationState.idle:
         await this.startGeneration(user, message, text);
@@ -195,4 +202,35 @@ export class ConversationService {
       data: { state: ConversationState.idle, activePostId: null },
     });
   }
+
+  private async deleteAccount(user: User): Promise<void> {
+    const posts = await this.prisma.post.findMany({
+      where: { userId: user.id },
+      select: { id: true, sourceMessageId: true, revisionMessageId: true },
+    });
+    const messageIds = posts.flatMap((post) =>
+      [post.sourceMessageId, post.revisionMessageId].filter((id): id is string => Boolean(id)),
+    );
+    if (messageIds.length > 0) {
+      await this.prisma.webhookEvent.deleteMany({ where: { waMessageId: { in: messageIds } } });
+    }
+    await Promise.all(posts.map((post) => this.removePreview(post.id)));
+    await this.prisma.user.delete({ where: { id: user.id } });
+    this.logger.log(`Deleted data for ${user.id}`);
+  }
+
+  private async removePreview(postId: string): Promise<void> {
+    const dir = this.config.env.storageDir;
+    if (!dir || !/^[\w-]+$/.test(postId)) {
+      return;
+    }
+    const root = resolve(process.cwd(), dir);
+    await Promise.all(
+      ['svg', 'jpg'].map((ext) => unlink(join(root, `${postId}.${ext}`)).catch(() => undefined)),
+    );
+  }
+}
+
+function isDataDeletionRequest(text: string): boolean {
+  return text.trim().toLowerCase().replace(/[.!]+$/g, '') === 'delete my data';
 }

@@ -11,5 +11,6 @@ export const COPY = {
   cancelled: 'Cancelled. Nothing was published.',
   published: 'Published to Facebook and Instagram.',
   noBrand: 'No brand is configured yet.',
+  deleted: 'Your Auto Post AI data has been deleted. Posts already published stay on Facebook or Instagram.',
   stillUpdating: 'Still updating the draft.',
 } as const;

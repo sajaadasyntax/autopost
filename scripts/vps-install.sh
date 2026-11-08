@@ -40,7 +40,7 @@ if [[ -f .env ]] && grep -Eq '^(LOCAL_DEV=true|WHATSAPP_VERIFY_TOKEN=local-verif
   exit 1
 fi
 
-if [[ ! -f .env ]]; then
+if [[ ! -s .env ]] || ! grep -q '^APP_ENCRYPTION_KEY=.\+' .env; then
   ENC="$(openssl rand -hex 32)"
   VERIFY="$(openssl rand -hex 16)"
   ADMIN="$(openssl rand -hex 24)"

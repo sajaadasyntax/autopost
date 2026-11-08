@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  phone        String        @unique
+  name         String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  posts        Post[]
+  conversation Conversation?
+
+  @@map("users")
+}
+
+model Brand {
+  id                   String   @id @default(cuid())
+  name                 String
+  tone                 String
+  audience             String
+  canvaBrandTemplateId String   @default("") @map("canva_brand_template_id")
+  fbPageId             String   @default("") @map("fb_page_id")
+  igUserId             String   @default("") @map("ig_user_id")
+  pageAccessTokenEnc   String   @map("page_access_token_enc")
+  createdAt            DateTime @default(now()) @map("created_at")
+  posts                Post[]
+
+  @@map("brands")
+}
+
+model IntegrationCredential {
+  id              String    @id @default(cuid())
+  provider        String    @unique
+  refreshTokenEnc String    @map("refresh_token_enc")
+  accessTokenEnc  String?   @map("access_token_enc")
+  expiresAt       DateTime? @map("expires_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("integration_credentials")
+}
+
+model Post {
+  id                String     @id @default(cuid())
+  userId            String     @map("user_id")
+  brandId           String     @map("brand_id")
+  brief             String
+  sourceMessageId   String?    @unique @map("source_message_id")
+  revisionMessageId String?    @map("revision_message_id")
+  headline          String?
+  caption           String?
+  hashtags          Json       @default("[]")
+  cta               String?
+  canvaDesignId     String?    @map("canva_design_id")
+  imageUrl          String?    @map("image_url")
+  previewSent       Boolean    @default(false) @map("preview_sent")
+  status            PostStatus @default(generating)
+  fbPostId          String?    @map("fb_post_id")
+  igContainerId     String?    @map("ig_container_id")
+  igMediaId         String?    @map("ig_media_id")
+  error             String?
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brand             Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("posts")
+}
+
+model Conversation {
+  id           String            @id @default(cuid())
+  userId       String            @unique @map("user_id")
+  state        ConversationState @default(idle)
+  activePostId String?           @map("active_post_id")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("conversations")
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  waMessageId String   @unique @map("wa_message_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("webhook_events")
+}
+
+enum PostStatus {
+  generating
+  draft
+  approved
+  publishing
+  published
+  failed
+  cancelled
+
+  @@map("post_status")
+}
+
+enum ConversationState {
+  idle
+  generating
+  awaiting_approval
+  awaiting_edit
+
+  @@map("conversation_state")
+}

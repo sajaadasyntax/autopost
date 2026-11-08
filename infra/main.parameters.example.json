@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appName": { "value": "autopost" },
+    "imageName": { "value": "myregistry.azurecr.io/autopost:latest" },
+    "storageAccountName": { "value": "autopostimages" },
+    "postgresPassword": { "value": "" },
+    "appEncryptionKey": { "value": "" },
+    "adminApiKey": { "value": "" },
+    "whatsappAppSecret": { "value": "" },
+    "whatsappVerifyToken": { "value": "" },
+    "whatsappToken": { "value": "" },
+    "whatsappPhoneNumberId": { "value": "" },
+    "allowlistPhones": { "value": "" },
+    "anthropicApiKey": { "value": "" },
+    "canvaClientId": { "value": "" },
+    "canvaClientSecret": { "value": "" },
+    "canvaRedirectUri": { "value": "https://autopost.azurewebsites.net/integrations/canva/callback" }
+  }
+}

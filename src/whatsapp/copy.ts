@@ -1,0 +1,15 @@
+export const COPY = {
+  refusal: 'This number is not set up for Autopost.',
+  needText: 'Send a text brief, for example: 20% off whitening.',
+  creating: 'Creating your draft…',
+  updating: 'Updating the draft…',
+  stillWorking: 'Still putting your draft together. I will send it here when it is ready.',
+  tapButtons: 'Tap Approve, Edit, or Cancel on the draft above.',
+  stale: 'That draft is no longer active.',
+  publishing: 'Publishing to Facebook and Instagram…',
+  editPrompt: 'Send the change you want, for example: shorter caption and mention Friday.',
+  cancelled: 'Cancelled. Nothing was published.',
+  published: 'Published to Facebook and Instagram.',
+  noBrand: 'No brand is configured yet.',
+  stillUpdating: 'Still updating the draft.',
+} as const;

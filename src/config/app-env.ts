@@ -1,0 +1,33 @@
+export type StorageDriver = 'azure' | 'local';
+export type QueueDriver = 'redis' | 'local';
+export type WhatsappTransport = 'graph' | 'local';
+
+export type AppEnv = {
+  port: number;
+  databaseUrl: string;
+  redisUrl: string;
+  queueDriver: QueueDriver;
+  whatsappTransport: WhatsappTransport;
+  localDev: boolean;
+  encryptionKey: Buffer;
+  adminApiKey: string;
+  publicBaseUrl: string;
+  storageDriver: StorageDriver;
+  storageDir: string;
+  blobContainer: string;
+  azureStorageConnectionString: string;
+  allowlist: Set<string>;
+  whatsappToken: string;
+  whatsappPhoneNumberId: string;
+  whatsappAppSecret: string;
+  whatsappVerifyToken: string;
+  graphVersion: string;
+  anthropicApiKey: string;
+  claudeModel: string;
+  canvaClientId: string;
+  canvaClientSecret: string;
+  canvaRedirectUri: string;
+  canvaFieldHeadline: string;
+  canvaFieldCaption: string;
+  canvaFieldCta: string;
+};

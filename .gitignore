@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+storage
+data
+coverage
+*.log
+.prisma
+*.db
+*.db-journal

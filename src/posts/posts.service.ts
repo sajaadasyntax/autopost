@@ -23,13 +23,22 @@ export class PostsService {
     return this.prisma.post.findUnique({ where: { id }, include: pipelineInclude });
   }
 
-  createGenerating(input: { userId: string; brandId: string; brief: string; sourceMessageId: string }) {
+  createGenerating(input: {
+    userId: string;
+    brandId: string;
+    brief: string;
+    sourceMessageId: string;
+    scheduledAt?: Date;
+    weekPlanId?: string;
+  }) {
     return this.prisma.post.create({
       data: {
         userId: input.userId,
         brandId: input.brandId,
         brief: input.brief,
         sourceMessageId: input.sourceMessageId,
+        scheduledAt: input.scheduledAt,
+        weekPlanId: input.weekPlanId,
         status: PostStatus.generating,
       },
     });
@@ -90,6 +99,22 @@ export class PostsService {
     return result.count === 1;
   }
 
+  async claimDue(postId: string, now: Date): Promise<boolean> {
+    const result = await this.prisma.post.updateMany({
+      where: { id: postId, status: PostStatus.scheduled, scheduledAt: { lte: now } },
+      data: { status: PostStatus.publishing },
+    });
+    return result.count === 1;
+  }
+
+  async markScheduled(postId: string): Promise<boolean> {
+    const result = await this.prisma.post.updateMany({
+      where: { id: postId, status: PostStatus.draft },
+      data: { status: PostStatus.scheduled },
+    });
+    return result.count === 1;
+  }
+
   async markPublishing(postId: string): Promise<boolean> {
     const result = await this.prisma.post.updateMany({
       where: { id: postId, status: { in: [PostStatus.draft, PostStatus.approved] } },
@@ -110,7 +135,7 @@ export class PostsService {
     return this.prisma.post.updateMany({
       where: {
         id: postId,
-        status: { in: [PostStatus.generating, PostStatus.draft, PostStatus.approved, PostStatus.publishing] },
+        status: { in: [PostStatus.generating, PostStatus.draft, PostStatus.approved, PostStatus.scheduled, PostStatus.publishing] },
       },
       data: { status: PostStatus.failed, error },
     });

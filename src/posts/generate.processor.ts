@@ -5,6 +5,7 @@ import { Job } from 'bullmq';
 import { isFinalAttempt, isPermanent, publicError } from '../common/errors';
 import { ContentService } from '../content/content.service';
 import { formatPostText } from '../content/format-copy';
+import { COPY } from '../whatsapp/copy';
 import { DesignService } from '../design/design.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GENERATE_POST_QUEUE } from '../queue/queue.names';
@@ -63,6 +64,12 @@ export class GenerateProcessor extends WorkerHost {
       if (!drafted) {
         return;
       }
+      if (post.scheduledAt) {
+        await this.posts.markScheduled(post.id);
+      }
+      if (post.weekPlanId) {
+        return;
+      }
     } else if (post.status !== PostStatus.draft) {
       return;
     }
@@ -83,7 +90,7 @@ export class GenerateProcessor extends WorkerHost {
     await this.whatsapp.sendDraftPreview({
       to: post.user.phone,
       postId: post.id,
-      body: formatPostText({ caption: post.caption, hashtags: post.hashtags, cta: post.cta }),
+      body: `${formatPostText({ caption: post.caption, hashtags: post.hashtags, cta: post.cta })}\n\n${COPY.previewChoices}`,
       imageUrl: post.imageUrl,
     });
     await this.posts.markPreviewSent(post.id);

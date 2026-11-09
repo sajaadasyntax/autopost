@@ -12,6 +12,9 @@ export type AppEnv = {
   encryptionKey: Buffer;
   adminApiKey: string;
   publicBaseUrl: string;
+  studioOrigin: string;
+  facebookAppId: string;
+  facebookAppSecret: string;
   storageDriver: StorageDriver;
   storageDir: string;
   blobContainer: string;

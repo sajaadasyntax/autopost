@@ -8,29 +8,101 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  phone        String        @unique
+  id           String             @id @default(cuid())
+  phone        String             @unique
   name         String?
-  createdAt    DateTime      @default(now()) @map("created_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
   posts        Post[]
   conversation Conversation?
+  brand        Brand?
+  accounts     ConnectedAccount[]
+  sessions     StudioSession[]
+  links        StudioLink[]
+  weekPlans    WeekPlan[]
 
   @@map("users")
 }
 
 model Brand {
   id                   String   @id @default(cuid())
+  userId               String?  @unique @map("user_id")
   name                 String
   tone                 String
   audience             String
+  industry             String   @default("")
+  website              String   @default("")
+  primaryColor         String   @default("#0f2744") @map("primary_color")
+  logoUrl              String   @default("") @map("logo_url")
+  description          String   @default("")
   canvaBrandTemplateId String   @default("") @map("canva_brand_template_id")
   fbPageId             String   @default("") @map("fb_page_id")
   igUserId             String   @default("") @map("ig_user_id")
   pageAccessTokenEnc   String   @map("page_access_token_enc")
   createdAt            DateTime @default(now()) @map("created_at")
   posts                Post[]
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("brands")
+}
+
+model ConnectedAccount {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  platform    String
+  externalId  String   @map("external_id")
+  displayName String   @default("") @map("display_name")
+  tokenEnc    String   @map("token_enc")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform])
+  @@map("connected_accounts")
+}
+
+model LoginCode {
+  id        String    @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([phone, code])
+  @@map("login_codes")
+}
+
+model StudioSession {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("studio_sessions")
+}
+
+model StudioLink {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("studio_links")
+}
+
+model WeekPlan {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  theme     String
+  startsOn  DateTime @map("starts_on")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts     Post[]
+
+  @@map("week_plans")
 }
 
 model IntegrationCredential {
@@ -63,10 +135,13 @@ model Post {
   igContainerId     String?    @map("ig_container_id")
   igMediaId         String?    @map("ig_media_id")
   error             String?
+  scheduledAt       DateTime?  @map("scheduled_at")
+  weekPlanId        String?    @map("week_plan_id")
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
   user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   brand             Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  weekPlan          WeekPlan?  @relation(fields: [weekPlanId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([status])
@@ -76,8 +151,10 @@ model Post {
 model Conversation {
   id           String            @id @default(cuid())
   userId       String            @unique @map("user_id")
-  state        ConversationState @default(idle)
-  activePostId String?           @map("active_post_id")
+  state            ConversationState @default(idle)
+  activePostId     String?           @map("active_post_id")
+  pendingBrief     String?           @map("pending_brief")
+  schedulePostId   String?           @map("schedule_post_id")
   updatedAt    DateTime          @updatedAt @map("updated_at")
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -96,6 +173,7 @@ enum PostStatus {
   generating
   draft
   approved
+  scheduled
   publishing
   published
   failed
@@ -107,8 +185,13 @@ enum PostStatus {
 enum ConversationState {
   idle
   generating
+  awaiting_brief
+  awaiting_audience
   awaiting_approval
   awaiting_edit
+  awaiting_schedule_day
+  awaiting_schedule_time
+  awaiting_week_theme
 
   @@map("conversation_state")
 }

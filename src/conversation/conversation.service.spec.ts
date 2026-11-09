@@ -57,6 +57,10 @@ describe('ConversationService', () => {
         return row;
       }),
     },
+    brand: {
+      findUnique: jest.fn(async (): Promise<{ id: string } | null> => ({ id: 'brand_1' })),
+      updateMany: jest.fn(async () => ({ count: 1 })),
+    },
   };
   const postsService = {
     findBySourceMessageId: jest.fn(async (sourceMessageId: string) => {
@@ -97,15 +101,23 @@ describe('ConversationService', () => {
     }),
   };
 
+  const studio = { confirmCode: jest.fn(async () => null), ensureBrand: jest.fn(async () => undefined) };
   const service = new ConversationService(
     prisma as never,
     postsService as never,
     brands as never,
     whatsapp as never,
-    { env: { allowlist: new Set(['15551230000']) } } as never,
+    { env: { allowlist: new Set(['15551230000']), studioOrigin: 'http://127.0.0.1:3011' } } as never,
     generateQueue as never,
     publishQueue as never,
+    studio as never,
   );
+
+  async function startDraft(): Promise<void> {
+    await service.handle(text('wamid.menu', '1'));
+    await service.handle(text('wamid.brief', '20% off whitening'));
+    await service.handle(text('wamid.1', 'Adults 25-45'));
+  }
 
   beforeEach(() => {
     posts.clear();
@@ -122,8 +134,8 @@ describe('ConversationService', () => {
   });
 
   it('turns an idle brief into one generate job', async () => {
-    await service.handle(text('wamid.1', '20% off whitening'));
-    await service.handle(text('wamid.1', '20% off whitening'));
+    await startDraft();
+    await service.handle(text('wamid.1', 'Adults 25-45'));
     expect(postsService.createGenerating).toHaveBeenCalledTimes(1);
     expect(generateQueue.add).toHaveBeenCalledWith(
       'generate',
@@ -135,21 +147,21 @@ describe('ConversationService', () => {
   });
 
   it('does not start a second draft while one is generating', async () => {
-    await service.handle(text('wamid.1', '20% off whitening'));
+    await startDraft();
     await service.handle(text('wamid.2', 'another offer'));
     expect(postsService.createGenerating).toHaveBeenCalledTimes(1);
     expect(whatsapp.sendText).toHaveBeenCalledWith('15551230000', COPY.stillWorking);
   });
 
   it('asks for a button tap while a draft is waiting', async () => {
-    await service.handle(text('wamid.1', '20% off whitening'));
+    await startDraft();
     conversations.get('user_1')!.state = ConversationState.awaiting_approval;
     await service.handle(text('wamid.2', 'approve it'));
-    expect(whatsapp.sendText).toHaveBeenCalledWith('15551230000', COPY.tapButtons);
+    expect(whatsapp.sendText).toHaveBeenCalledWith('15551230000', COPY.previewChoices);
   });
 
   it('regenerates once when the edit reply arrives', async () => {
-    await service.handle(text('wamid.1', '20% off whitening'));
+    await startDraft();
     const post = posts.get('post_1')!;
     post.status = PostStatus.draft;
     conversations.get('user_1')!.state = ConversationState.awaiting_approval;
@@ -166,7 +178,7 @@ describe('ConversationService', () => {
   });
 
   it('approves a draft once and ignores a second tap', async () => {
-    await service.handle(text('wamid.1', '20% off whitening'));
+    await startDraft();
     posts.get('post_1')!.status = PostStatus.draft;
     await service.handle(button('wamid.2', 'approve:post_1'));
     await service.handle(button('wamid.3', 'approve:post_1'));
@@ -181,7 +193,7 @@ describe('ConversationService', () => {
   });
 
   it('cancels the active draft and ignores a stale button', async () => {
-    await service.handle(text('wamid.1', '20% off whitening'));
+    await startDraft();
     posts.get('post_1')!.status = PostStatus.draft;
     await service.handle(button('wamid.2', 'cancel:other'));
     expect(whatsapp.sendText).toHaveBeenCalledWith('15551230000', COPY.stale);
@@ -210,8 +222,8 @@ describe('ConversationService', () => {
   });
 
   it('tells the user when the brand row is missing', async () => {
-    brands.findFirst.mockResolvedValue(null);
-    await service.handle(text('wamid.1', '20% off whitening'));
+    prisma.brand.findUnique.mockResolvedValue(null);
+    await startDraft();
     expect(postsService.createGenerating).not.toHaveBeenCalled();
     expect(whatsapp.sendText).toHaveBeenCalledWith('15551230000', COPY.noBrand);
   });

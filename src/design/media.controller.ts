@@ -14,7 +14,7 @@ export class MediaController {
       res.status(404).send('Not found');
       return;
     }
-    res.type(name.endsWith('.svg') ? 'image/svg+xml' : 'image/jpeg');
+    res.type(name.endsWith('.svg') ? 'image/svg+xml' : name.endsWith('.png') ? 'image/png' : 'image/jpeg');
     createReadStream(file).pipe(res);
   }
 }

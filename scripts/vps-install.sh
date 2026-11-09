@@ -50,6 +50,7 @@ PORT=${PORT}
 DATABASE_URL=file:../data/autopost.db
 REDIS_URL=
 PUBLIC_BASE_URL=https://${HOST}
+STUDIO_ORIGIN=https://studio.alzahaby.cloud
 APP_ENCRYPTION_KEY=${ENC}
 ADMIN_API_KEY=${ADMIN}
 ALLOWLIST_PHONES=

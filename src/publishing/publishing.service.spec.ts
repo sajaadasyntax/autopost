@@ -32,7 +32,14 @@ describe('PublishingService', () => {
     publishContainer: jest.fn(async () => 'ig_media_1'),
   };
   const cipher = { decrypt: jest.fn(() => 'page-token') };
-  const service = new PublishingService(posts as never, meta as never, cipher as never, { env: { localDev: false } } as never);
+  const prisma = { connectedAccount: { findMany: jest.fn(async () => []) } };
+  const service = new PublishingService(
+    posts as never,
+    meta as never,
+    cipher as never,
+    { env: { localDev: false } } as never,
+    prisma as never,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();

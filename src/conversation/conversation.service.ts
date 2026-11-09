@@ -9,6 +9,8 @@ import { PostsService } from '../posts/posts.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GENERATE_JOBS, JobPort, PUBLISH_JOBS } from '../queue/job.port';
 import { jobOptions } from '../queue/queue.names';
+import { StudioAuthService } from '../studio/studio-auth.service';
+import { addDays, formatDate, khartoumDate, khartoumInstant, nextMonday, parseDate, weekdayName } from '../common/khartoum';
 import { COPY } from '../whatsapp/copy';
 import { IncomingMessage, parseButtonId } from '../whatsapp/parse-webhook';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
@@ -25,6 +27,7 @@ export class ConversationService {
     private readonly config: AppConfigService,
     @Inject(GENERATE_JOBS) private readonly generateQueue: JobPort,
     @Inject(PUBLISH_JOBS) private readonly publishQueue: JobPort,
+    private readonly studio: StudioAuthService,
   ) {}
 
   async handle(message: IncomingMessage): Promise<void> {
@@ -41,11 +44,21 @@ export class ConversationService {
       create: { phone, name: message.name },
       update: message.name ? { name: message.name } : {},
     });
+    await this.studio.ensureBrand(user.id);
     const conversation = await this.prisma.conversation.upsert({
       where: { userId: user.id },
       create: { userId: user.id, state: ConversationState.idle },
       update: {},
     });
+
+    if (message.kind === 'text' && message.text && /^\d{6}$/.test(message.text.trim())) {
+      const linked = await this.studio.confirmCode(phone, message.text);
+      if (linked) {
+        await this.whatsapp.sendText(phone, `${COPY.studioReady} ${linked.url}`);
+        await this.whatsapp.sendText(phone, COPY.menu);
+        return;
+      }
+    }
 
     if (message.kind === 'button' && message.buttonId) {
       await this.handleButton(user, conversation, message.buttonId);
@@ -67,20 +80,106 @@ export class ConversationService {
     }
     switch (conversation.state) {
       case ConversationState.idle:
-        await this.startGeneration(user, message, text);
+        await this.handleIdle(user, conversation, text);
         return;
       case ConversationState.generating:
         await this.whatsapp.sendText(user.phone, COPY.stillWorking);
         return;
+      case ConversationState.awaiting_brief:
+        await this.prisma.conversation.update({
+          where: { userId: user.id },
+          data: { state: ConversationState.awaiting_audience, pendingBrief: text },
+        });
+        await this.whatsapp.sendText(user.phone, COPY.askAudience);
+        return;
+      case ConversationState.awaiting_audience:
+        await this.prisma.brand.updateMany({ where: { userId: user.id }, data: { audience: text } });
+        await this.startGeneration(user, message, conversation.pendingBrief || text);
+        return;
       case ConversationState.awaiting_approval:
-        await this.whatsapp.sendText(user.phone, COPY.tapButtons);
+        await this.handleApprovalText(user, conversation, text);
         return;
       case ConversationState.awaiting_edit:
         await this.revise(user, conversation, message, text);
         return;
-      default:
+      case ConversationState.awaiting_schedule_day:
+        await this.chooseDay(user, conversation, text);
         return;
+      case ConversationState.awaiting_schedule_time:
+        await this.chooseTime(user, conversation, text);
+        return;
+      case ConversationState.awaiting_week_theme:
+        await this.buildWeek(user, text);
+        return;
+      default:
+        await this.whatsapp.sendText(user.phone, COPY.menu);
     }
+  }
+
+  private async handleIdle(user: User, conversation: Conversation, text: string): Promise<void> {
+    const command = idleCommand(text);
+    if (command === 'create') {
+      await this.prisma.conversation.update({
+        where: { userId: user.id },
+        data: { state: ConversationState.awaiting_brief, pendingBrief: null },
+      });
+      await this.whatsapp.sendText(user.phone, COPY.askBrief);
+      return;
+    }
+    if (command === 'week') {
+      await this.prisma.conversation.update({
+        where: { userId: user.id },
+        data: { state: ConversationState.awaiting_week_theme },
+      });
+      await this.whatsapp.sendText(user.phone, COPY.askTheme);
+      return;
+    }
+    if (command === 'schedule') {
+      await this.beginSchedule(user, conversation);
+      return;
+    }
+    if (command === 'drafts') {
+      await this.sendDrafts(user);
+      return;
+    }
+    if (command === 'brand') {
+      await this.whatsapp.sendText(user.phone, `Brand settings: ${this.config.env.studioOrigin}/brand`);
+      return;
+    }
+    if (command === 'analytics') {
+      await this.sendAnalytics(user);
+      return;
+    }
+    await this.whatsapp.sendText(user.phone, COPY.menu);
+  }
+
+  private async handleApprovalText(user: User, conversation: Conversation, text: string): Promise<void> {
+    const choice = text.trim().toLowerCase();
+    if (!conversation.activePostId) {
+      await this.whatsapp.sendText(user.phone, COPY.tapButtons);
+      return;
+    }
+    if (choice === '1' || choice === 'approve') {
+      await this.approve(user, conversation.activePostId);
+      return;
+    }
+    if (choice === '2' || choice === 'edit') {
+      await this.prisma.conversation.update({
+        where: { userId: user.id },
+        data: { state: ConversationState.awaiting_edit },
+      });
+      await this.whatsapp.sendText(user.phone, COPY.editPrompt);
+      return;
+    }
+    if (choice === '3' || choice === 'regenerate') {
+      await this.regenerate(user, conversation.activePostId);
+      return;
+    }
+    if (choice === '4' || choice === 'schedule') {
+      await this.beginSchedule(user, conversation);
+      return;
+    }
+    await this.whatsapp.sendText(user.phone, COPY.previewChoices);
   }
 
   private async startGeneration(user: User, message: IncomingMessage, brief: string): Promise<void> {
@@ -93,7 +192,7 @@ export class ConversationService {
       return;
     }
 
-    const brand = await this.brands.findFirst();
+    const brand = await this.prisma.brand.findUnique({ where: { userId: user.id } });
     if (!brand) {
       await this.whatsapp.sendText(user.phone, COPY.noBrand);
       return;
@@ -196,10 +295,137 @@ export class ConversationService {
     return this.generateQueue.add('generate', { postId, revision }, jobOptions(`generate:${messageId}`, 5000));
   }
 
+  private async regenerate(user: User, postId: string): Promise<void> {
+    const post = await this.posts.findById(postId);
+    if (!post || post.status !== PostStatus.draft) {
+      await this.whatsapp.sendText(user.phone, COPY.tapButtons);
+      return;
+    }
+    const messageId = `regen-${postId}-${Date.now()}`;
+    await this.posts.beginRevision(postId, messageId);
+    await this.prisma.conversation.update({
+      where: { userId: user.id },
+      data: { state: ConversationState.generating, activePostId: postId },
+    });
+    await this.whatsapp.sendText(user.phone, COPY.updating);
+    await this.enqueueGenerate(postId, messageId);
+  }
+
+  private async beginSchedule(user: User, conversation: Conversation): Promise<void> {
+    const active = conversation.activePostId ? await this.posts.findById(conversation.activePostId) : null;
+    const post =
+      active && (active.status === PostStatus.draft || active.status === PostStatus.scheduled)
+        ? active
+        : await this.prisma.post.findFirst({
+            where: { userId: user.id, status: { in: [PostStatus.draft, PostStatus.scheduled] } },
+            orderBy: { createdAt: 'desc' },
+          });
+    if (!post) {
+      await this.whatsapp.sendText(user.phone, COPY.noDraft);
+      return;
+    }
+    await this.prisma.conversation.update({
+      where: { userId: user.id },
+      data: { state: ConversationState.awaiting_schedule_day, schedulePostId: post.id, activePostId: post.id },
+    });
+    await this.whatsapp.sendText(user.phone, COPY.askDay);
+  }
+
+  private async chooseDay(user: User, conversation: Conversation, text: string): Promise<void> {
+    const today = khartoumDate();
+    const choice = text.trim().toLowerCase();
+    const date = choice === '1' || choice === 'today' ? today : choice === '2' || choice === 'tomorrow' ? addDays(today, 1) : parseDate(text);
+    if (!date) {
+      await this.whatsapp.sendText(user.phone, COPY.askDay);
+      return;
+    }
+    await this.prisma.conversation.update({
+      where: { userId: user.id },
+      data: { state: ConversationState.awaiting_schedule_time, pendingBrief: formatDate(date) },
+    });
+    await this.whatsapp.sendText(user.phone, COPY.askTime);
+  }
+
+  private async chooseTime(user: User, conversation: Conversation, text: string): Promise<void> {
+    const hours: Record<string, number> = { '1': 9, '9': 9, '9am': 9, '2': 12, '12': 12, '12pm': 12, '3': 15, '3pm': 15, '4': 18, '6': 18, '6pm': 18 };
+    const hour = hours[text.trim().toLowerCase()];
+    const date = conversation.pendingBrief ? parseDate(conversation.pendingBrief) : null;
+    if (!hour || !date || !conversation.schedulePostId) {
+      await this.whatsapp.sendText(user.phone, COPY.askTime);
+      return;
+    }
+    await this.prisma.post.update({
+      where: { id: conversation.schedulePostId },
+      data: { scheduledAt: khartoumInstant(date, hour), status: PostStatus.scheduled },
+    });
+    await this.idle(user.id);
+    await this.whatsapp.sendText(user.phone, `${COPY.scheduled} ${formatDate(date)} at ${hour}:00 Africa/Khartoum.`);
+  }
+
+  private async buildWeek(user: User, text: string): Promise<void> {
+    const theme = weekTheme(text);
+    if (!theme) {
+      await this.whatsapp.sendText(user.phone, COPY.askTheme);
+      return;
+    }
+    const brand = await this.prisma.brand.findUnique({ where: { userId: user.id } });
+    if (!brand) {
+      await this.whatsapp.sendText(user.phone, COPY.noBrand);
+      return;
+    }
+    const monday = nextMonday();
+    const plan = await this.prisma.weekPlan.create({
+      data: { userId: user.id, theme, startsOn: khartoumInstant(monday, 9) },
+    });
+    const lines: string[] = [COPY.weekStarted];
+    for (let offset = 0; offset < 7; offset += 1) {
+      const day = addDays(monday, offset);
+      const brief = weekBrief(theme, weekdayName(day), brand.name);
+      const sourceMessageId = `week-${plan.id}-${offset}`;
+      const post = await this.posts.createGenerating({
+        userId: user.id,
+        brandId: brand.id,
+        brief,
+        sourceMessageId,
+        scheduledAt: khartoumInstant(day, 9),
+        weekPlanId: plan.id,
+      });
+      await this.enqueueGenerate(post.id, sourceMessageId);
+      lines.push(`${weekdayName(day)} ${formatDate(day)}: ${brief}`);
+    }
+    await this.idle(user.id);
+    await this.whatsapp.sendText(user.phone, lines.join('\n'));
+  }
+
+  private async sendDrafts(user: User): Promise<void> {
+    const rows = await this.prisma.post.findMany({
+      where: { userId: user.id, status: { in: [PostStatus.draft, PostStatus.scheduled, PostStatus.published, PostStatus.failed] } },
+      orderBy: { createdAt: 'desc' },
+      take: 8,
+    });
+    if (!rows.length) {
+      await this.whatsapp.sendText(user.phone, COPY.noDraft);
+      return;
+    }
+    const lines = rows.map((post) => `${post.status}: ${post.headline || post.brief}`);
+    await this.whatsapp.sendText(user.phone, lines.join('\n'));
+  }
+
+  private async sendAnalytics(user: User): Promise<void> {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const count = await this.prisma.post.count({
+      where: { userId: user.id, status: PostStatus.published, updatedAt: { gte: since } },
+    });
+    await this.whatsapp.sendText(
+      user.phone,
+      `Last 30 days\nPosts published: ${count}\nOpen ${this.config.env.studioOrigin}/analytics`,
+    );
+  }
+
   private idle(userId: string) {
     return this.prisma.conversation.update({
       where: { userId },
-      data: { state: ConversationState.idle, activePostId: null },
+      data: { state: ConversationState.idle, activePostId: null, pendingBrief: null, schedulePostId: null },
     });
   }
 
@@ -233,4 +459,31 @@ export class ConversationService {
 
 function isDataDeletionRequest(text: string): boolean {
   return text.trim().toLowerCase().replace(/[.!]+$/g, '') === 'delete my data';
+}
+
+function idleCommand(text: string): 'menu' | 'create' | 'week' | 'schedule' | 'drafts' | 'brand' | 'analytics' | null {
+  const value = text.trim().toLowerCase();
+  if (['hi', 'hello', 'menu', 'start'].includes(value)) return 'menu';
+  if (value === '1' || value === 'create' || value === 'create post') return 'create';
+  if (value === '2' || value.startsWith('generate')) return 'week';
+  if (value === '3' || value === 'schedule' || value === 'schedule posts') return 'schedule';
+  if (value === '4' || value === 'drafts' || value === 'view drafts') return 'drafts';
+  if (value === '5' || value === 'brand' || value === 'brand settings') return 'brand';
+  if (value === '6' || value === 'analytics') return 'analytics';
+  return null;
+}
+
+function weekTheme(text: string): 'promotions' | 'educational' | 'mixed' | null {
+  const value = text.trim().toLowerCase();
+  if (value === '1' || value === 'promotions') return 'promotions';
+  if (value === '2' || value === 'educational') return 'educational';
+  if (value === '3' || value === 'mixed') return 'mixed';
+  return null;
+}
+
+function weekBrief(theme: 'promotions' | 'educational' | 'mixed', day: string, brand: string): string {
+  if (theme === 'promotions') return `${day} promotion for ${brand}`;
+  if (theme === 'educational') return `${day} educational tip for ${brand}`;
+  if (day === 'Tuesday' || day === 'Friday' || day === 'Sunday') return `${day} promotion for ${brand}`;
+  return `${day} educational tip for ${brand}`;
 }

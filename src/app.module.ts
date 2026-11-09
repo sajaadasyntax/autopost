@@ -13,6 +13,8 @@ import { LegalModule } from './legal/legal.module';
 import { PostsModule } from './posts/posts.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PublishingModule } from './publishing/publishing.module';
+import { ScheduleModule } from './schedule/schedule.module';
+import { StudioModule } from './studio/studio.module';
 import { LocalWorkers } from './queue/local-workers';
 import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
@@ -32,6 +34,8 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     ContentModule,
     DesignModule,
     PublishingModule,
+    ScheduleModule,
+    StudioModule,
     ConversationModule,
     DevModule,
     HealthModule,

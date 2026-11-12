@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Header,
+  Param,
   Post,
   Put,
   Query,
@@ -24,6 +26,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AccountsService, BrandInput } from './accounts.service';
 import { FacebookOAuthService } from './facebook-oauth.service';
 import { StudioAuthService } from './studio-auth.service';
+import { BrandPreviewService } from './brand-preview.service';
+import { TemplatesService } from './templates.service';
 import { StudioRequest, StudioSessionGuard } from './studio-session.guard';
 
 @Controller('studio')
@@ -32,6 +36,8 @@ export class StudioController {
     private readonly auth: StudioAuthService,
     private readonly accounts: AccountsService,
     private readonly facebook: FacebookOAuthService,
+    private readonly templates: TemplatesService,
+    private readonly preview: BrandPreviewService,
     private readonly prisma: PrismaService,
     private readonly cipher: TokenCipher,
     private readonly config: AppConfigService,
@@ -69,8 +75,17 @@ export class StudioController {
   @Put('brand')
   @UseGuards(StudioSessionGuard)
   async putBrand(@Req() request: StudioRequest, @Body() body: BrandInput) {
-    const brand = await this.accounts.updateBrand(request.studioUser!.id, body);
-    return publicBrand(brand);
+    const user = request.studioUser!;
+    const brand = await this.accounts.updateBrand(user.id, body);
+    let previewSent = false;
+    let previewError = '';
+    try {
+      await this.preview.send(user, brand);
+      previewSent = true;
+    } catch (error) {
+      previewError = publicError(error);
+    }
+    return { ...publicBrand(brand), previewSent, previewError };
   }
 
   @Post('brand/logo')
@@ -104,6 +119,40 @@ export class StudioController {
   ) {
     await this.accounts.saveManual(request.studioUser!.id, body);
     return this.accounts.list(request.studioUser!.id);
+  }
+
+  @Get('templates')
+  @UseGuards(StudioSessionGuard)
+  templatesList(@Query('published') published?: string) {
+    return this.templates.list(published === 'true');
+  }
+
+  @Post('templates')
+  @UseGuards(StudioSessionGuard)
+  createTemplate(@Body() body: { name?: string }) {
+    return this.templates.create(body.name ?? '');
+  }
+
+  @Get('templates/:id')
+  @UseGuards(StudioSessionGuard)
+  template(@Param('id') id: string) {
+    return this.templates.get(id);
+  }
+
+  @Put('templates/:id')
+  @UseGuards(StudioSessionGuard)
+  saveTemplate(
+    @Param('id') id: string,
+    @Body() body: { name?: string; document?: unknown; published?: boolean },
+  ) {
+    return this.templates.update(id, body);
+  }
+
+  @Delete('templates/:id')
+  @UseGuards(StudioSessionGuard)
+  async deleteTemplate(@Param('id') id: string) {
+    await this.templates.remove(id);
+    return { ok: true };
   }
 
   @Get('oauth/facebook')
@@ -205,9 +254,10 @@ function publicBrand(brand: {
   industry: string;
   website: string;
   primaryColor: string;
-  logoUrl: string;
-  description: string;
-}) {
+    logoUrl: string;
+    description: string;
+    templateId: string | null;
+  }) {
   return {
     id: brand.id,
     name: brand.name,
@@ -218,6 +268,7 @@ function publicBrand(brand: {
     primaryColor: brand.primaryColor,
     logoUrl: brand.logoUrl,
     description: brand.description,
+    templateId: brand.templateId,
   };
 }
 

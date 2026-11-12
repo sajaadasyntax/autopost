@@ -1,10 +1,21 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { encryptString, parseEncryptionKey } from '../src/crypto/token-cipher';
+import { blankTemplate } from '../src/design/template-document';
 
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
+  await prisma.designTemplate.upsert({
+    where: { id: 'starter-square' },
+    update: {},
+    create: {
+      id: 'starter-square',
+      name: 'قالب مربع',
+      published: true,
+      document: blankTemplate() as object,
+    },
+  });
   const key = parseEncryptionKey(process.env.APP_ENCRYPTION_KEY ?? '');
   const token = process.env.PAGE_ACCESS_TOKEN?.trim() || 'replace-me';
   const phone = (process.env.ALLOWLIST_PHONES ?? '').split(',')[0]?.replace(/\D/g, '') || '';

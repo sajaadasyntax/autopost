@@ -5,7 +5,7 @@ export type OutboxButton = { id: string; title: string };
 export type OutboxMessage = {
   at: string;
   to: string;
-  kind: 'text' | 'preview';
+  kind: 'text' | 'preview' | 'image';
   body: string;
   imageUrl?: string | null;
   buttons?: OutboxButton[];

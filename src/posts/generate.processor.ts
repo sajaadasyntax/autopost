@@ -123,9 +123,15 @@ export class GenerateProcessor extends WorkerHost {
         caption: current.caption ?? '',
         cta: current.cta ?? '',
       };
-      const image = (await this.design.isConfigured())
-        ? await this.design.createImage({ ...fields, templateId: current.brand.canvaBrandTemplateId })
-        : await this.design.createLocalPreview(fields);
+      const templateId = current.brand.templateId;
+      const template = templateId
+        ? await this.prisma.designTemplate.findUnique({ where: { id: templateId } })
+        : await this.prisma.designTemplate.findFirst({ where: { published: true }, orderBy: { updatedAt: 'desc' } });
+      const image = template?.published
+        ? await this.design.renderTemplate({ ...fields, document: template.document })
+        : (await this.design.isConfigured())
+          ? await this.design.createImage({ ...fields, templateId: current.brand.canvaBrandTemplateId })
+          : await this.design.createLocalPreview(fields);
       if (image) {
         if (!(await this.stillGenerating(current.id))) {
           return null;

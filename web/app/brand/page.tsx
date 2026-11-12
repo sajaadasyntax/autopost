@@ -11,7 +11,10 @@ type Brand = {
   tone: string;
   audience: string;
   logoUrl: string;
+  templateId: string;
 };
+
+type TemplateOption = { id: string; name: string; published: boolean };
 
 const empty: Brand = {
   name: '',
@@ -22,36 +25,53 @@ const empty: Brand = {
   tone: 'professional',
   audience: '',
   logoUrl: '',
+  templateId: '',
 };
 
 export default function BrandPage() {
   const [brand, setBrand] = useState<Brand>(empty);
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
-    void fetch('/api/nest/brand').then(async (response) => {
-      if (!response.ok) {
+    void (async () => {
+      const [brandResponse, templateResponse] = await Promise.all([
+        fetch('/api/nest/brand'),
+        fetch('/api/nest/templates?published=true'),
+      ]);
+      if (!brandResponse.ok) {
         setError('افتح رابط الاستوديو من واتساب أولاً.');
         return;
       }
-      setBrand(await response.json());
-    });
+      const saved = (await brandResponse.json()) as Brand;
+      const published = templateResponse.ok ? ((await templateResponse.json()) as TemplateOption[]) : [];
+      setTemplates(published);
+      setBrand({ ...empty, ...saved, templateId: saved.templateId || published[0]?.id || '' });
+    })();
   }, []);
 
   async function save(event: FormEvent) {
     event.preventDefault();
     setError('');
+    setNotice('');
     const response = await fetch('/api/nest/brand', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(brand),
     });
     if (!response.ok) {
-      const body = await response.json();
+      const body = await response.json().catch(() => ({}));
       setError(body.message || 'تعذر حفظ العلامة.');
       return;
     }
-    setBrand(await response.json());
+    const saved = await response.json();
+    setBrand(saved);
+    setNotice(
+      saved.previewSent
+        ? 'تم حفظ العلامة. صورة القالب مع تفاصيل منتجك في طريقها إلى واتساب.'
+        : 'تم حفظ العلامة، لكن صورة القالب لم تصل إلى واتساب.',
+    );
   }
 
   async function upload(file: File) {
@@ -93,6 +113,17 @@ export default function BrandPage() {
           <textarea value={brand.description} onChange={(event) => setBrand({ ...brand, description: event.target.value })} />
         </label>
         <label>
+          القالب
+          <select value={brand.templateId} onChange={(event) => setBrand({ ...brand, templateId: event.target.value })}>
+            {templates.length === 0 ? <option value="">قالب مربع</option> : null}
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
           الأسلوب
           <select value={brand.tone} onChange={(event) => setBrand({ ...brand, tone: event.target.value })}>
             <option value="professional">مهني</option>
@@ -117,6 +148,7 @@ export default function BrandPage() {
         {brand.logoUrl ? <img src={brand.logoUrl} alt="الشعار" width={120} /> : null}
         <button type="submit">حفظ العلامة</button>
       </form>
+      {notice ? <p>{notice}</p> : null}
       {error ? <p className="error">{error}</p> : null}
     </section>
   );

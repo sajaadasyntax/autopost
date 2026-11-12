@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PermanentError } from '../common/errors';
 import { AppConfigService } from '../config/app-config.service';
 import { CanvaService } from './canva.service';
+import { parseTemplateDocument, renderTemplateSvg } from './template-document';
+import { rasterizeSvg } from './template-raster';
 import { MediaStorageService } from './media-storage.service';
 
 @Injectable()
@@ -29,6 +31,18 @@ export class DesignService {
     const rendered = await this.canva.autofillAndExport(input);
     const imageUrl = await this.media.uploadJpeg(input.postId, rendered.bytes);
     return { designId: rendered.designId, imageUrl };
+  }
+
+  async renderTemplate(input: {
+    postId: string;
+    document: unknown;
+    headline: string;
+    caption: string;
+    cta: string;
+  }): Promise<{ designId: string; imageUrl: string }> {
+    const svg = renderTemplateSvg(parseTemplateDocument(input.document), input);
+    const imageUrl = await this.media.uploadPng(input.postId, rasterizeSvg(svg));
+    return { designId: `template-${input.postId}`, imageUrl };
   }
 
   async createLocalPreview(input: {

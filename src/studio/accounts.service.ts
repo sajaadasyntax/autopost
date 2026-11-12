@@ -13,6 +13,7 @@ export type BrandInput = {
   description?: string;
   tone?: string;
   audience?: string;
+  templateId?: string;
 };
 
 @Injectable()
@@ -31,7 +32,7 @@ export class AccountsService {
     if (tone && !TONES.has(tone)) {
       throw new BadRequestException('Tone must be professional, friendly, luxury, or educational.');
     }
-    const data = {
+    const data: Record<string, string | null | undefined> = {
       name: input.name?.trim(),
       industry: input.industry?.trim(),
       website: input.website?.trim(),
@@ -40,8 +41,22 @@ export class AccountsService {
       tone,
       audience: input.audience?.trim(),
     };
+    if (input.templateId !== undefined) {
+      data.templateId = await this.publishedTemplateId(input.templateId);
+    }
     const clean = Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
     return this.prisma.brand.update({ where: { userId }, data: clean });
+  }
+
+  private async publishedTemplateId(templateId: string): Promise<string | null> {
+    if (!templateId) {
+      return null;
+    }
+    const template = await this.prisma.designTemplate.findUnique({ where: { id: templateId } });
+    if (!template?.published) {
+      throw new BadRequestException('Choose a published template.');
+    }
+    return template.id;
   }
 
   async setLogo(userId: string, logoUrl: string): Promise<Brand> {

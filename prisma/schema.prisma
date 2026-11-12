@@ -35,14 +35,28 @@ model Brand {
   logoUrl              String   @default("") @map("logo_url")
   description          String   @default("")
   canvaBrandTemplateId String   @default("") @map("canva_brand_template_id")
+  templateId           String?  @map("template_id")
   fbPageId             String   @default("") @map("fb_page_id")
   igUserId             String   @default("") @map("ig_user_id")
   pageAccessTokenEnc   String   @map("page_access_token_enc")
   createdAt            DateTime @default(now()) @map("created_at")
   posts                Post[]
   user                 User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template             DesignTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
 
   @@map("brands")
+}
+
+model DesignTemplate {
+  id         String   @id @default(cuid())
+  name       String
+  document   Json
+  published  Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  brands     Brand[]
+
+  @@map("design_templates")
 }
 
 model ConnectedAccount {

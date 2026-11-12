@@ -109,6 +109,10 @@ describe('GenerateProcessor', () => {
       update: jest.fn(),
       findUnique: jest.fn(async () => ({ activePostId: 'post_1', userId: 'user_1' })),
     },
+    designTemplate: {
+      findUnique: jest.fn(async () => null),
+      findFirst: jest.fn(async () => null),
+    },
   };
   const processor = new GenerateProcessor(posts as never, content as never, design as never, whatsapp as never, prisma as never);
 

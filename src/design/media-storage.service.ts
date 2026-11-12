@@ -18,6 +18,18 @@ export class MediaStorageService {
     return `${this.config.env.publicBaseUrl}/media/${name}`;
   }
 
+  async uploadPng(name: string, bytes: Buffer): Promise<string> {
+    const safe = name.replace(/[^\w.-]/g, '');
+    if (!safe) {
+      throw new NotFoundException();
+    }
+    const root = resolve(process.cwd(), this.config.env.storageDir);
+    await mkdir(root, { recursive: true });
+    const fileName = `${safe}.png`;
+    await writeFile(join(root, fileName), bytes);
+    return `${this.config.env.publicBaseUrl}/media/${fileName}`;
+  }
+
   async uploadJpeg(postId: string, bytes: Buffer): Promise<string> {
     if (this.config.env.storageDriver === 'azure') {
       return this.uploadAzure(postId, bytes);

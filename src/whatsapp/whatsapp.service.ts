@@ -33,6 +33,21 @@ export class WhatsappService {
     });
   }
 
+  async sendImage(to: string, imageUrl: string, caption: string): Promise<void> {
+    if (this.config.env.whatsappTransport === 'local') {
+      this.outbox.push({ to, kind: 'image', body: caption, imageUrl });
+      this.logger.log(`Local WhatsApp image to ${to}: ${imageUrl}`);
+      return;
+    }
+    await this.post({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'image',
+      image: { link: imageUrl, caption },
+    });
+  }
+
   async sendDraftPreview(input: {
     to: string;
     postId: string;

@@ -11,10 +11,10 @@ type Account = {
 };
 
 const LABELS: Record<string, string> = {
-  facebook: 'Facebook Page',
-  instagram: 'Instagram',
-  linkedin: 'LinkedIn',
-  x: 'X',
+  facebook: 'صفحة فيسبوك',
+  instagram: 'إنستغرام',
+  linkedin: 'لينكدإن',
+  x: 'إكس',
 };
 
 export default function ConnectPage() {
@@ -28,7 +28,7 @@ export default function ConnectPage() {
   async function load() {
     const response = await fetch('/api/nest/accounts');
     if (response.status === 401) {
-      setError('Open the studio link from WhatsApp first.');
+      setError('افتح رابط الاستوديو من واتساب أولاً.');
       return;
     }
     applyAccounts(await response.json());
@@ -53,7 +53,7 @@ export default function ConnectPage() {
   async function save(event: FormEvent) {
     event.preventDefault();
     setError('');
-    setNotice('Saving…');
+    setNotice('جارٍ الحفظ…');
     try {
       const response = await fetch('/api/nest/accounts', {
         method: 'POST',
@@ -63,27 +63,27 @@ export default function ConnectPage() {
       const body = (await response.json()) as { message?: string } | Account[];
       if (!response.ok) {
         setNotice('');
-        setError((body as { message?: string }).message || 'Could not save the accounts.');
+        setError((body as { message?: string }).message || 'تعذر حفظ الحسابات.');
         return;
       }
       applyAccounts(body as Account[]);
       setPageAccessToken('');
-      setNotice('Saved.');
+      setNotice('تم الحفظ.');
     } catch {
       setNotice('');
-      setError('Could not reach the studio API.');
+      setError('تعذر الاتصال بالاستوديو.');
     }
   }
 
   return (
     <section>
-      <h1>Connected accounts</h1>
+      <h1>الحسابات المتصلة</h1>
       {accounts
         .filter((account) => account.available || account.connected)
         .map((account) => (
           <article key={account.platform} className="card">
             <strong>{LABELS[account.platform] ?? account.platform}</strong>
-            <p>{account.connected ? 'Connected' : 'Not connected'}</p>
+            <p>{account.connected ? 'متصل' : 'غير متصل'}</p>
             {account.connected ? (
               <p>
                 {account.displayName}
@@ -93,22 +93,22 @@ export default function ConnectPage() {
           </article>
         ))}
       <p>
-        <a href="/api/nest/oauth/facebook">Connect with Facebook</a>
+        <a href="/api/nest/oauth/facebook">الربط عبر فيسبوك</a>
       </p>
       <form onSubmit={save}>
         <label>
-          Facebook Page id
+          معرّف صفحة فيسبوك
           <input value={fbPageId} onChange={(event) => setFbPageId(event.target.value)} />
         </label>
         <label>
-          Instagram user id
+          معرّف إنستغرام
           <input value={igUserId} onChange={(event) => setIgUserId(event.target.value)} />
         </label>
         <label>
-          Page token
+          رمز الصفحة
           <input value={pageAccessToken} onChange={(event) => setPageAccessToken(event.target.value)} />
         </label>
-        <button type="submit">Save accounts</button>
+        <button type="submit">حفظ الحسابات</button>
       </form>
       {notice ? <p>{notice}</p> : null}
       {error ? <p className="error">{error}</p> : null}

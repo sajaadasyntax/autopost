@@ -4,9 +4,9 @@ import { requestJson } from '../common/http';
 import { OutboxService } from '../dev/outbox.service';
 
 const PREVIEW_BUTTONS = [
-  { title: 'Approve', action: 'approve' },
-  { title: 'Edit', action: 'edit' },
-  { title: 'Cancel', action: 'cancel' },
+  { title: 'موافقة', action: 'approve' },
+  { title: 'تعديل', action: 'edit' },
+  { title: 'إلغاء', action: 'cancel' },
 ] as const;
 
 @Injectable()
@@ -55,9 +55,9 @@ export class WhatsappService {
       body: { text: input.body },
       action: {
         buttons: [
-          { type: 'reply', reply: { id: `approve:${input.postId}`, title: 'Approve' } },
-          { type: 'reply', reply: { id: `edit:${input.postId}`, title: 'Edit' } },
-          { type: 'reply', reply: { id: `cancel:${input.postId}`, title: 'Cancel' } },
+          { type: 'reply', reply: { id: `approve:${input.postId}`, title: 'موافقة' } },
+          { type: 'reply', reply: { id: `edit:${input.postId}`, title: 'تعديل' } },
+          { type: 'reply', reply: { id: `cancel:${input.postId}`, title: 'إلغاء' } },
         ],
       },
     };

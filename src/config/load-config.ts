@@ -48,6 +48,8 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppEnv {
     graphVersion: env.GRAPH_API_VERSION?.trim() || 'v21.0',
     anthropicApiKey: env.ANTHROPIC_API_KEY?.trim() ?? '',
     claudeModel: env.CLAUDE_MODEL?.trim() || 'claude-sonnet-4-5',
+    geminiApiKey: env.GEMINI_API_KEY?.trim() ?? '',
+    geminiModel: env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash',
     canvaClientId: env.CANVA_CLIENT_ID?.trim() ?? '',
     canvaClientSecret: env.CANVA_CLIENT_SECRET?.trim() ?? '',
     canvaRedirectUri: env.CANVA_REDIRECT_URI?.trim() ?? '',

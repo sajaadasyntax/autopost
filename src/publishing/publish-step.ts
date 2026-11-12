@@ -53,9 +53,9 @@ export function readGraphId(body: unknown): string {
 
 export function publishFailureText(post: { fbPostId: string | null; igMediaId: string | null }, message: string): string {
   if (post.fbPostId && !post.igMediaId) {
-    return `Facebook published, but Instagram failed. ${message}`;
+    return `نُشر على فيسبوك، وتعذر النشر على إنستغرام. ${message}`;
   }
-  return `Couldn't publish that post. ${message}`;
+  return `تعذر نشر هذا المنشور. ${message}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

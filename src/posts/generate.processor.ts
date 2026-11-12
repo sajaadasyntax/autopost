@@ -160,7 +160,7 @@ export class GenerateProcessor extends WorkerHost {
       });
     }
     try {
-      await this.whatsapp.sendText(post.user.phone, `Couldn't finish that draft. ${publicError(error)}`);
+      await this.whatsapp.sendText(post.user.phone, `تعذر إنهاء هذه المسودة. ${publicError(error)}`);
     } catch {
       this.logger.error(`Could not report a draft failure for ${postId}`);
     }

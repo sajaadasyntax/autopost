@@ -27,6 +27,8 @@ export type AppEnv = {
   graphVersion: string;
   anthropicApiKey: string;
   claudeModel: string;
+  geminiApiKey: string;
+  geminiModel: string;
   canvaClientId: string;
   canvaClientSecret: string;
   canvaRedirectUri: string;

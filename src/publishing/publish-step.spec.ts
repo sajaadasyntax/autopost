@@ -18,6 +18,6 @@ describe('publish step', () => {
     expect(readContainerStatus({ status_code: 'FINISHED' })).toBe('finished');
     expect(readContainerStatus({ status_code: 'ERROR' })).toBe('error');
     expect(readPhotoPostId({ id: 'photo', post_id: 'page_post' })).toBe('page_post');
-    expect(publishFailureText({ fbPostId: 'fb', igMediaId: null }, 'timeout')).toMatch(/Facebook published/);
+    expect(publishFailureText({ fbPostId: 'fb', igMediaId: null }, 'timeout')).toMatch(/فيسبوك/);
   });
 });

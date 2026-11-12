@@ -26,7 +26,7 @@ describe('format copy', () => {
   it('builds a local stand-in when Claude is not configured', () => {
     const copy = localCopy({ brief: '20% off whitening', revision: 'mention Friday' });
     expect(copy.headline).toContain('Friday');
-    expect(copy.cta).toBe('Book now');
+    expect(copy.cta).toBe('احجز الآن');
     expect(formatPostText(copy).length).toBeLessThanOrEqual(1024);
   });
 

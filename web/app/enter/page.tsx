@@ -11,7 +11,7 @@ function EnterInner() {
   useEffect(() => {
     const token = params.get('token');
     if (!token) {
-      setError('This login link is missing.');
+      setError('رابط الدخول غير مكتمل.');
       return;
     }
     void fetch('/api/nest/enter', {
@@ -20,14 +20,14 @@ function EnterInner() {
       body: JSON.stringify({ token }),
     }).then(async (response) => {
       if (!response.ok) {
-        setError('This login link has expired.');
+        setError('انتهت صلاحية رابط الدخول.');
         return;
       }
       router.replace('/brand');
     });
   }, [params, router]);
 
-  return <section>{error ? <p className="error">{error}</p> : <p>Opening the studio…</p>}</section>;
+  return <section>{error ? <p className="error">{error}</p> : <p>جارٍ فتح الاستوديو…</p>}</section>;
 }
 
 export default function EnterPage() {

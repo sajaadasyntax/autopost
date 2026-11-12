@@ -6,7 +6,7 @@ export const metadata = { title: 'AutoPost AI' };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="ar" dir="rtl">
       <body>
         <main>
           <Nav />

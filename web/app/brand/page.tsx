@@ -31,7 +31,7 @@ export default function BrandPage() {
   useEffect(() => {
     void fetch('/api/nest/brand').then(async (response) => {
       if (!response.ok) {
-        setError('Open the studio link from WhatsApp first.');
+        setError('افتح رابط الاستوديو من واتساب أولاً.');
         return;
       }
       setBrand(await response.json());
@@ -48,7 +48,7 @@ export default function BrandPage() {
     });
     if (!response.ok) {
       const body = await response.json();
-      setError(body.message || 'Could not save the brand.');
+      setError(body.message || 'تعذر حفظ العلامة.');
       return;
     }
     setBrand(await response.json());
@@ -62,7 +62,7 @@ export default function BrandPage() {
       body: JSON.stringify({ dataBase64 }),
     });
     if (!response.ok) {
-      setError('Could not upload the logo.');
+      setError('تعذر رفع الشعار.');
       return;
     }
     setBrand(await response.json());
@@ -70,39 +70,39 @@ export default function BrandPage() {
 
   return (
     <section>
-      <h1>Your brand</h1>
+      <h1>علامتك</h1>
       <form onSubmit={save}>
         <label>
-          Business name
+          اسم النشاط
           <input value={brand.name} onChange={(event) => setBrand({ ...brand, name: event.target.value })} />
         </label>
         <label>
-          Industry
+          المجال
           <input value={brand.industry} onChange={(event) => setBrand({ ...brand, industry: event.target.value })} />
         </label>
         <label>
-          Website
+          الموقع
           <input value={brand.website} onChange={(event) => setBrand({ ...brand, website: event.target.value })} />
         </label>
         <label>
-          Primary color
+          اللون الأساسي
           <input value={brand.primaryColor} onChange={(event) => setBrand({ ...brand, primaryColor: event.target.value })} />
         </label>
         <label>
-          Description
+          الوصف
           <textarea value={brand.description} onChange={(event) => setBrand({ ...brand, description: event.target.value })} />
         </label>
         <label>
-          Tone
+          الأسلوب
           <select value={brand.tone} onChange={(event) => setBrand({ ...brand, tone: event.target.value })}>
-            <option value="professional">Professional</option>
-            <option value="friendly">Friendly</option>
-            <option value="luxury">Luxury</option>
-            <option value="educational">Educational</option>
+            <option value="professional">مهني</option>
+            <option value="friendly">ودود</option>
+            <option value="luxury">فاخر</option>
+            <option value="educational">تعليمي</option>
           </select>
         </label>
         <label>
-          Logo
+          الشعار
           <input
             type="file"
             accept="image/png,image/jpeg"
@@ -114,8 +114,8 @@ export default function BrandPage() {
             }}
           />
         </label>
-        {brand.logoUrl ? <img src={brand.logoUrl} alt="Logo" width={120} /> : null}
-        <button type="submit">Save brand</button>
+        {brand.logoUrl ? <img src={brand.logoUrl} alt="الشعار" width={120} /> : null}
+        <button type="submit">حفظ العلامة</button>
       </form>
       {error ? <p className="error">{error}</p> : null}
     </section>

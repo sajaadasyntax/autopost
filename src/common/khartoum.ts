@@ -49,7 +49,12 @@ export function parseDate(value: string): KhartoumDate | null {
 }
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEKDAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 
 export function weekdayName(date: KhartoumDate): string {
   return WEEKDAYS[weekdayIndex(date)];
+}
+
+export function weekdayNameAr(date: KhartoumDate): string {
+  return WEEKDAYS_AR[weekdayIndex(date)];
 }

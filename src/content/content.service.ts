@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import Anthropic, { APIError } from '@anthropic-ai/sdk';
 import { HttpError, PermanentError } from '../common/errors';
+import { requestJson } from '../common/http';
 import { AppConfigService } from '../config/app-config.service';
 import { PostCopy, buildContentPrompt, localCopy, normalizeCopy } from './format-copy';
 
@@ -32,13 +33,16 @@ export class ContentService {
     brief: string;
     revision?: string;
   }): Promise<PostCopy> {
+    const prompt = buildContentPrompt(input);
     if (!this.config.env.anthropicApiKey) {
+      if (this.config.env.geminiApiKey) {
+        return this.gemini(prompt);
+      }
       if (this.config.env.localDev) {
         return localCopy(input);
       }
-      throw new PermanentError('ANTHROPIC_API_KEY is not configured.');
+      throw new PermanentError('Set GEMINI_API_KEY or ANTHROPIC_API_KEY.');
     }
-    const prompt = buildContentPrompt(input);
     try {
       const response = await this.anthropic().messages.create({
         model: this.config.env.claudeModel,
@@ -64,10 +68,64 @@ export class ContentService {
     }
   }
 
+  private async gemini(prompt: { system: string; user: string }): Promise<PostCopy> {
+    const model = this.config.env.geminiModel;
+    const { body } = await requestJson(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': this.config.env.geminiApiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: prompt.system }] },
+          contents: [{ role: 'user', parts: [{ text: prompt.user }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                headline: { type: 'STRING' },
+                caption: { type: 'STRING' },
+                hashtags: { type: 'ARRAY', items: { type: 'STRING' } },
+                cta: { type: 'STRING' },
+              },
+              required: ['headline', 'caption', 'hashtags', 'cta'],
+            },
+          },
+        }),
+      },
+    );
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readGeminiText(body));
+    } catch (error) {
+      if (error instanceof PermanentError) {
+        throw error;
+      }
+      throw new PermanentError('Gemini did not return a post.');
+    }
+    return normalizeCopy(parsed);
+  }
+
   private anthropic(): Anthropic {
     if (!this.client) {
       this.client = new Anthropic({ apiKey: this.config.env.anthropicApiKey });
     }
     return this.client;
   }
+}
+
+function readGeminiText(body: unknown): string {
+  const record = body && typeof body === 'object' ? (body as Record<string, unknown>) : {};
+  const candidates = Array.isArray(record.candidates) ? record.candidates : [];
+  const first = candidates[0] && typeof candidates[0] === 'object' ? (candidates[0] as Record<string, unknown>) : {};
+  const content = first.content && typeof first.content === 'object' ? (first.content as Record<string, unknown>) : {};
+  const parts = Array.isArray(content.parts) ? content.parts : [];
+  const part = parts[0] && typeof parts[0] === 'object' ? (parts[0] as Record<string, unknown>) : {};
+  if (typeof part.text !== 'string' || !part.text.trim()) {
+    throw new PermanentError('Gemini did not return a post.');
+  }
+  return part.text;
 }

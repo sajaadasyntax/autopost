@@ -16,7 +16,7 @@ export default function AnalyticsPage() {
   useEffect(() => {
     void fetch('/api/nest/analytics').then(async (response) => {
       if (!response.ok) {
-        setError('Open the studio link from WhatsApp first.');
+        setError('افتح رابط الاستوديو من واتساب أولاً.');
         return;
       }
       setData(await response.json());
@@ -25,14 +25,14 @@ export default function AnalyticsPage() {
 
   return (
     <section>
-      <h1>Last 30 days</h1>
+      <h1>آخر ٣٠ يوماً</h1>
       {error ? <p className="error">{error}</p> : null}
       {data ? (
         <>
-          <p>Posts published: {data.postsPublished}</p>
-          <p>Reach: {data.reach ?? 'Unavailable'}</p>
-          <p>Engagement: {data.engagement ?? 'Unavailable'}</p>
-          <p>Best post: {data.bestPost ? data.bestPost.headline || data.bestPost.brief : 'None yet'}</p>
+          <p>المنشورات: {data.postsPublished}</p>
+          <p>الوصول: {data.reach ?? 'غير متاح'}</p>
+          <p>التفاعل: {data.engagement ?? 'غير متاح'}</p>
+          <p>أفضل منشور: {data.bestPost ? data.bestPost.headline || data.bestPost.brief : 'لا يوجد بعد'}</p>
         </>
       ) : null}
     </section>

@@ -27,9 +27,9 @@ export function localCopy(input: { brief: string; revision?: string }): PostCopy
   const subject = input.revision ? `${input.brief} (${input.revision})` : input.brief;
   return normalizeCopy({
     headline: subject,
-    caption: `${subject}. Limited time at the clinic.`,
-    hashtags: ['SmileDental', 'LocalPreview'],
-    cta: 'Book now',
+    caption: `${subject}. العرض لفترة محدودة.`,
+    hashtags: ['عرض', 'تجربة'],
+    cta: 'احجز الآن',
   });
 }
 
@@ -54,7 +54,7 @@ export function normalizeCopy(input: unknown): PostCopy {
         .slice(0, 10)
     : [];
   if (!headline || !caption || !cta) {
-    throw new PermanentError('Claude returned an empty headline, caption, or CTA.');
+    throw new PermanentError('The model returned an empty headline, caption, or CTA.');
   }
   return { headline, caption, hashtags, cta };
 }
@@ -88,6 +88,7 @@ export function buildContentPrompt(input: {
     'Caption is under 700 characters and does not contain hashtags.',
     'Return 8 to 10 hashtags.',
     'CTA is under 40 characters.',
+    'Write the headline, caption, hashtags, and CTA in Arabic.',
   ].join('\n');
   const user = input.revision
     ? `Original brief:\n${input.brief}\n\nChange requested:\n${input.revision}`

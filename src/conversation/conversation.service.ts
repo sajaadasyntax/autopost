@@ -10,8 +10,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GENERATE_JOBS, JobPort, PUBLISH_JOBS } from '../queue/job.port';
 import { jobOptions } from '../queue/queue.names';
 import { StudioAuthService } from '../studio/studio-auth.service';
-import { addDays, formatDate, khartoumDate, khartoumInstant, nextMonday, parseDate, weekdayName } from '../common/khartoum';
-import { COPY } from '../whatsapp/copy';
+import { addDays, formatDate, khartoumDate, khartoumInstant, nextMonday, parseDate, weekdayIndex, weekdayNameAr } from '../common/khartoum';
+import { COPY, POST_STATUS_AR } from '../whatsapp/copy';
 import { IncomingMessage, parseButtonId } from '../whatsapp/parse-webhook';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 
@@ -143,7 +143,7 @@ export class ConversationService {
       return;
     }
     if (command === 'brand') {
-      await this.whatsapp.sendText(user.phone, `Brand settings: ${this.config.env.studioOrigin}/brand`);
+      await this.whatsapp.sendText(user.phone, `إعدادات العلامة: ${this.config.env.studioOrigin}/brand`);
       return;
     }
     if (command === 'analytics') {
@@ -359,7 +359,7 @@ export class ConversationService {
       data: { scheduledAt: khartoumInstant(date, hour), status: PostStatus.scheduled },
     });
     await this.idle(user.id);
-    await this.whatsapp.sendText(user.phone, `${COPY.scheduled} ${formatDate(date)} at ${hour}:00 Africa/Khartoum.`);
+    await this.whatsapp.sendText(user.phone, `${COPY.scheduled} ${formatDate(date)} الساعة ${hour}:00 بتوقيت الخرطوم.`);
   }
 
   private async buildWeek(user: User, text: string): Promise<void> {
@@ -380,7 +380,7 @@ export class ConversationService {
     const lines: string[] = [COPY.weekStarted];
     for (let offset = 0; offset < 7; offset += 1) {
       const day = addDays(monday, offset);
-      const brief = weekBrief(theme, weekdayName(day), brand.name);
+      const brief = weekBrief(theme, day, brand.name);
       const sourceMessageId = `week-${plan.id}-${offset}`;
       const post = await this.posts.createGenerating({
         userId: user.id,
@@ -391,7 +391,7 @@ export class ConversationService {
         weekPlanId: plan.id,
       });
       await this.enqueueGenerate(post.id, sourceMessageId);
-      lines.push(`${weekdayName(day)} ${formatDate(day)}: ${brief}`);
+      lines.push(`${weekdayNameAr(day)} ${formatDate(day)}: ${brief}`);
     }
     await this.idle(user.id);
     await this.whatsapp.sendText(user.phone, lines.join('\n'));
@@ -407,7 +407,7 @@ export class ConversationService {
       await this.whatsapp.sendText(user.phone, COPY.noDraft);
       return;
     }
-    const lines = rows.map((post) => `${post.status}: ${post.headline || post.brief}`);
+    const lines = rows.map((post) => `${POST_STATUS_AR[post.status] ?? post.status}: ${post.headline || post.brief}`);
     await this.whatsapp.sendText(user.phone, lines.join('\n'));
   }
 
@@ -418,7 +418,7 @@ export class ConversationService {
     });
     await this.whatsapp.sendText(
       user.phone,
-      `Last 30 days\nPosts published: ${count}\nOpen ${this.config.env.studioOrigin}/analytics`,
+      `آخر ٣٠ يوماً\nالمنشورات: ${count}\nافتح ${this.config.env.studioOrigin}/analytics`,
     );
   }
 
@@ -458,12 +458,13 @@ export class ConversationService {
 }
 
 function isDataDeletionRequest(text: string): boolean {
-  return text.trim().toLowerCase().replace(/[.!]+$/g, '') === 'delete my data';
+  const value = text.trim().toLowerCase().replace(/[.!]+$/g, '');
+  return value === 'delete my data' || value === 'احذف بياناتي';
 }
 
 function idleCommand(text: string): 'menu' | 'create' | 'week' | 'schedule' | 'drafts' | 'brand' | 'analytics' | null {
   const value = text.trim().toLowerCase();
-  if (['hi', 'hello', 'menu', 'start'].includes(value)) return 'menu';
+  if (['hi', 'hello', 'menu', 'start', 'مرحبا', 'أهلا', 'اهلا', 'القائمة'].includes(value)) return 'menu';
   if (value === '1' || value === 'create' || value === 'create post') return 'create';
   if (value === '2' || value.startsWith('generate')) return 'week';
   if (value === '3' || value === 'schedule' || value === 'schedule posts') return 'schedule';
@@ -481,9 +482,15 @@ function weekTheme(text: string): 'promotions' | 'educational' | 'mixed' | null 
   return null;
 }
 
-function weekBrief(theme: 'promotions' | 'educational' | 'mixed', day: string, brand: string): string {
-  if (theme === 'promotions') return `${day} promotion for ${brand}`;
-  if (theme === 'educational') return `${day} educational tip for ${brand}`;
-  if (day === 'Tuesday' || day === 'Friday' || day === 'Sunday') return `${day} promotion for ${brand}`;
-  return `${day} educational tip for ${brand}`;
+function weekBrief(
+  theme: 'promotions' | 'educational' | 'mixed',
+  day: { year: number; month: number; day: number },
+  brand: string,
+): string {
+  const name = weekdayNameAr(day);
+  const index = weekdayIndex(day);
+  if (theme === 'promotions') return `عرض ${name} لـ ${brand}`;
+  if (theme === 'educational') return `نصيحة ${name} لـ ${brand}`;
+  if (index === 0 || index === 2 || index === 5) return `عرض ${name} لـ ${brand}`;
+  return `نصيحة ${name} لـ ${brand}`;
 }

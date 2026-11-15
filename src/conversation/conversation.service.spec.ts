@@ -133,6 +133,13 @@ describe('ConversationService', () => {
     expect(postsService.createGenerating).not.toHaveBeenCalled();
   });
 
+  it('restores the menu from the middle of a post', async () => {
+    await service.handle(text('wamid.menu', '1'));
+    await service.handle(text('wamid.back', 'القائمة'));
+    expect(whatsapp.sendText).toHaveBeenLastCalledWith('15551230000', COPY.menu);
+    expect(conversations.get('user_1')?.state).toBe(ConversationState.idle);
+  });
+
   it('turns an idle brief into one generate job', async () => {
     await startDraft();
     await service.handle(text('wamid.1', 'Adults 25-45'));

@@ -78,6 +78,14 @@ export class ConversationService {
       await this.whatsapp.sendText(user.phone, COPY.deleted);
       return;
     }
+    if (isMenuRequest(text)) {
+      await this.prisma.conversation.update({
+        where: { userId: user.id },
+        data: { state: ConversationState.idle, pendingBrief: null },
+      });
+      await this.whatsapp.sendText(user.phone, COPY.menu);
+      return;
+    }
     switch (conversation.state) {
       case ConversationState.idle:
         await this.handleIdle(user, conversation, text);
@@ -462,9 +470,14 @@ function isDataDeletionRequest(text: string): boolean {
   return value === 'delete my data' || value === 'احذف بياناتي';
 }
 
+function isMenuRequest(text: string): boolean {
+  const value = text.trim().toLowerCase();
+  return ['0', 'hi', 'hello', 'menu', 'start', 'مرحبا', 'أهلا', 'اهلا', 'القائمة', 'القائمه', 'رجوع'].includes(value);
+}
+
 function idleCommand(text: string): 'menu' | 'create' | 'week' | 'schedule' | 'drafts' | 'brand' | 'analytics' | null {
   const value = text.trim().toLowerCase();
-  if (['hi', 'hello', 'menu', 'start', 'مرحبا', 'أهلا', 'اهلا', 'القائمة'].includes(value)) return 'menu';
+  if (isMenuRequest(value)) return 'menu';
   if (value === '1' || value === 'create' || value === 'create post') return 'create';
   if (value === '2' || value.startsWith('generate')) return 'week';
   if (value === '3' || value === 'schedule' || value === 'schedule posts') return 'schedule';

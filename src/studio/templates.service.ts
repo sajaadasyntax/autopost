@@ -23,7 +23,7 @@ export class TemplatesService implements OnModuleInit {
   async ensureStarter() {
     const existing = await this.prisma.designTemplate.findUnique({ where: { id: STARTER_TEMPLATE_ID } });
     if (existing) {
-      return existing;
+      return this.withLogoSlot(existing);
     }
     return this.prisma.designTemplate.create({
       data: {
@@ -32,6 +32,22 @@ export class TemplatesService implements OnModuleInit {
         published: true,
         document: blankTemplate() as unknown as Prisma.InputJsonValue,
       },
+    });
+  }
+
+  private async withLogoSlot(existing: { id: string; document: unknown }) {
+    const record = existing.document && typeof existing.document === 'object' ? (existing.document as { objects?: unknown[] }) : {};
+    const objects = Array.isArray(record.objects) ? record.objects : [];
+    if (objects.some((item) => item && typeof item === 'object' && (item as { type?: string }).type === 'image')) {
+      return existing;
+    }
+    const logo = blankTemplate().objects.find((item) => item.type === 'image');
+    if (!logo) {
+      return existing;
+    }
+    return this.prisma.designTemplate.update({
+      where: { id: existing.id },
+      data: { document: { ...record, objects: [...objects, logo] } as unknown as Prisma.InputJsonValue },
     });
   }
 

@@ -28,6 +28,7 @@ import { FacebookOAuthService } from './facebook-oauth.service';
 import { StudioAuthService } from './studio-auth.service';
 import { BrandPreviewService } from './brand-preview.service';
 import { TemplatesService } from './templates.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { StudioRequest, StudioSessionGuard } from './studio-session.guard';
 
 @Controller('studio')
@@ -41,11 +42,13 @@ export class StudioController {
     private readonly prisma: PrismaService,
     private readonly cipher: TokenCipher,
     private readonly config: AppConfigService,
+    private readonly whatsapp: WhatsappService,
   ) {}
 
   @Post('login')
-  login(@Body() body: { phone?: string }) {
-    return this.auth.requestCode(body.phone ?? '');
+  async login(@Body() body: { phone?: string; password?: string }) {
+    const sessionToken = await this.auth.login(body.phone ?? '', body.password ?? '');
+    return { sessionToken };
   }
 
   @Post('enter')
@@ -117,8 +120,18 @@ export class StudioController {
     @Req() request: StudioRequest,
     @Body() body: { fbPageId?: string; igUserId?: string; pageAccessToken?: string },
   ) {
-    await this.accounts.saveManual(request.studioUser!.id, body);
-    return this.accounts.list(request.studioUser!.id);
+    const user = request.studioUser!;
+    try {
+      await this.accounts.saveManual(user.id, body);
+    } catch (error) {
+      const message = publicError(error);
+      await this.whatsapp.sendText(user.phone, `تعذر ربط الحسابات. ${message}`).catch(() => undefined);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(message);
+    }
+    return this.accounts.list(user.id);
   }
 
   @Get('templates')
@@ -173,7 +186,13 @@ export class StudioController {
     try {
       await this.facebook.exchange(code, state);
     } catch (caught) {
-      throw new BadRequestException(publicError(caught));
+      const message = publicError(caught);
+      const userId = this.facebook.userIdFromState(state);
+      const user = userId ? await this.prisma.user.findUnique({ where: { id: userId } }) : null;
+      if (user) {
+        await this.whatsapp.sendText(user.phone, `تعذر ربط الحسابات. ${message}`).catch(() => undefined);
+      }
+      throw new BadRequestException(message);
     }
     return `<p>Facebook connected. Return to <a href="${this.config.env.studioOrigin}/connect">the studio</a>.</p>`;
   }

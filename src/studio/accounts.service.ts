@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Brand } from '@prisma/client';
+import { publicError } from '../common/errors';
+import { requestJson } from '../common/http';
+import { AppConfigService } from '../config/app-config.service';
 import { TokenCipher } from '../crypto/token-cipher.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -21,6 +24,7 @@ export class AccountsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cipher: TokenCipher,
+    private readonly config: AppConfigService,
   ) {}
 
   brandFor(userId: string): Promise<Brand | null> {
@@ -86,16 +90,18 @@ export class AccountsService {
     const fbPageId = input.fbPageId?.trim() ?? '';
     const igUserId = input.igUserId?.trim() ?? '';
     if (!token || !fbPageId) {
-      throw new BadRequestException('Facebook Page id and Page token are required.');
+      throw new BadRequestException('معرّف الصفحة ورمز الصفحة مطلوبان.');
     }
+    const page = await this.verifyPage(fbPageId, token);
+    const instagramId = igUserId || page.igUserId;
     const tokenEnc = this.cipher.encrypt(token);
-    await this.upsert(userId, 'facebook', fbPageId, 'Facebook Page', tokenEnc);
-    if (igUserId) {
-      await this.upsert(userId, 'instagram', igUserId, 'Instagram', tokenEnc);
+    await this.upsert(userId, 'facebook', fbPageId, page.name, tokenEnc);
+    if (instagramId) {
+      await this.upsert(userId, 'instagram', instagramId, 'Instagram', tokenEnc);
     }
     await this.prisma.brand.update({
       where: { userId },
-      data: { fbPageId, igUserId, pageAccessTokenEnc: tokenEnc },
+      data: { fbPageId, igUserId: instagramId, pageAccessTokenEnc: tokenEnc },
     });
   }
 
@@ -116,6 +122,25 @@ export class AccountsService {
         pageAccessTokenEnc: tokenEnc,
       },
     });
+  }
+
+  private async verifyPage(pageId: string, token: string): Promise<{ name: string; igUserId: string }> {
+    const url = new URL(`https://graph.facebook.com/${this.config.env.graphVersion}/${pageId}`);
+    url.searchParams.set('fields', 'id,name,instagram_business_account');
+    url.searchParams.set('access_token', token);
+    try {
+      const { body } = await requestJson(url.toString());
+      const record = body && typeof body === 'object' ? (body as { id?: string; name?: string; instagram_business_account?: { id?: string } }) : {};
+      if (record.id !== pageId) {
+        throw new BadRequestException('رمز الصفحة لا يطابق معرّف الصفحة.');
+      }
+      return { name: record.name || 'Facebook Page', igUserId: record.instagram_business_account?.id || '' };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`رفض فيسبوك ربط الصفحة. ${publicError(error)}`);
+    }
   }
 
   private upsert(userId: string, platform: string, externalId: string, displayName: string, tokenEnc: string) {

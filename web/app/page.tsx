@@ -1,10 +1,12 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function WelcomePage() {
+  const router = useRouter();
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
   async function submit(event: FormEvent) {
@@ -13,33 +15,32 @@ export default function WelcomePage() {
     const response = await fetch('/api/nest/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone }),
+      body: JSON.stringify({ phone, password }),
     });
-    const body = await response.json();
+    const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      setError(body.message || 'لا يمكن تسجيل الدخول بهذا الرقم.');
+      setError(body.message || 'تعذر تسجيل الدخول.');
       return;
     }
-    setCode(body.code);
+    router.push('/brand');
   }
 
   return (
     <section>
       <h1>أوتو بوست</h1>
-      <p>أدِر حساباتك من واتساب.</p>
+      <p>ادخل برقم واتساب وكلمة المرور. أول دخول يحفظ كلمة المرور لهذا الرقم.</p>
       <form onSubmit={submit}>
         <label>
-          رقم الهاتف
-          <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="249912345678" />
+          رقم واتساب
+          <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="249912345678" inputMode="tel" />
         </label>
-        <button type="submit">ابدأ</button>
+        <label>
+          كلمة المرور
+          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        </label>
+        <button type="submit">دخول</button>
       </form>
       {error ? <p className="error">{error}</p> : null}
-      {code ? (
-        <p>
-          أرسل <strong>{code}</strong> إلى رقم واتساب أوتو بوست. الرد يحتوي على رابط الاستوديو.
-        </p>
-      ) : null}
     </section>
   );
 }

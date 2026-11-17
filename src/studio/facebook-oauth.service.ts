@@ -31,6 +31,14 @@ export class FacebookOAuthService {
     return url.toString();
   }
 
+  userIdFromState(state: string): string | null {
+    try {
+      return this.open(state);
+    } catch {
+      return null;
+    }
+  }
+
   async exchange(code: string, state: string): Promise<void> {
     const userId = this.open(state);
     const tokenUrl = new URL(`https://graph.facebook.com/${this.config.env.graphVersion}/oauth/access_token`);

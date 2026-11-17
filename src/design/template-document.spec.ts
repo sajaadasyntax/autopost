@@ -21,6 +21,18 @@ describe('template document', () => {
     expect(() => parseTemplateDocument(document)).toThrow(/headline, caption, and CTA/);
   });
 
+  it('fits a long headline and places the logo inside its frame', () => {
+    const svg = renderTemplateSvg(blankTemplate(), {
+      headline: 'عرض كبير جداً على كل خدمات التبييض والتنظيف لهذا الأسبوع فقط',
+      caption: 'تفاصيل المنتج تظهر داخل المساحة المخصصة دون أن تغطي زر الطلب.',
+      cta: 'اطلب الآن',
+      logoHref: 'data:image/png;base64,aaaa',
+    });
+    expect(svg).toContain('data:image/png;base64,aaaa');
+    expect(svg).toContain('clipPath');
+    expect(svg).not.toContain('font-size="64"');
+  });
+
   it('rasterizes the filled template to a PNG', () => {
     const svg = renderTemplateSvg(blankTemplate(), {
       headline: 'عيادة النور',

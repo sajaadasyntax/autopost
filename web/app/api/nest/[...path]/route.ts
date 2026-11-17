@@ -20,7 +20,7 @@ async function proxy(request: NextRequest, path: string[]): Promise<NextResponse
     return NextResponse.redirect(location);
   }
   const text = await response.text();
-  if (path.join('/') === 'enter' && response.ok) {
+  if ((path.join('/') === 'enter' || path.join('/') === 'login') && response.ok) {
     const parsed = JSON.parse(text) as { sessionToken?: string };
     const next = NextResponse.json({ ok: true });
     if (parsed.sessionToken) {

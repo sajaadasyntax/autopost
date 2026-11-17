@@ -25,6 +25,7 @@ export class BrandPreviewService {
       headline: brand.name || 'علامتك',
       caption: brand.description || brand.audience || brand.industry || brand.name || 'تفاصيل المنتج',
       cta: 'اطلب الآن',
+      logoUrl: brand.logoUrl,
     });
     await this.whatsapp.sendImage(
       user.phone,

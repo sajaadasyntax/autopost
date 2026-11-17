@@ -40,7 +40,7 @@ export class PublishProcessor extends WorkerHost {
         await this.posts.markPublished(post.id);
         await this.idle(post.userId, post.id);
       }
-      await this.notify(post.user.phone);
+      await this.notify(post);
       return;
     }
     if (step === 'claim') {
@@ -56,7 +56,7 @@ export class PublishProcessor extends WorkerHost {
       if (published) {
         await this.idle(post.userId, post.id);
       }
-      await this.notify(post.user.phone);
+      await this.notify(post);
     } catch (error) {
       if (isPermanent(error)) {
         await this.fail(post.id, error);
@@ -100,9 +100,13 @@ export class PublishProcessor extends WorkerHost {
     });
   }
 
-  private async notify(phone: string): Promise<void> {
+  private async notify(post: { id: string; user: { phone: string }; igMediaId: string | null }): Promise<void> {
+    const latest = await this.posts.findForPipeline(post.id);
+    const text = latest?.igMediaId
+      ? COPY.published
+      : 'تم النشر على فيسبوك. حساب إنستغرام غير مربوط، لذلك لم يُنشر هناك.';
     try {
-      await this.whatsapp.sendText(phone, COPY.published);
+      await this.whatsapp.sendText(post.user.phone, text);
     } catch {
       this.logger.error('Published, but the WhatsApp confirmation failed');
     }

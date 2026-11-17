@@ -1,5 +1,7 @@
+import { readFile } from 'fs/promises';
 import { Injectable } from '@nestjs/common';
 import { PermanentError } from '../common/errors';
+import { requestBuffer } from '../common/http';
 import { AppConfigService } from '../config/app-config.service';
 import { CanvaService } from './canva.service';
 import { parseTemplateDocument, renderTemplateSvg } from './template-document';
@@ -39,10 +41,37 @@ export class DesignService {
     headline: string;
     caption: string;
     cta: string;
+    logoUrl?: string;
   }): Promise<{ designId: string; imageUrl: string }> {
-    const svg = renderTemplateSvg(parseTemplateDocument(input.document), input);
+    const svg = renderTemplateSvg(parseTemplateDocument(input.document), {
+      ...input,
+      logoHref: await this.logoHref(input.logoUrl),
+    });
     const imageUrl = await this.media.uploadPng(input.postId, rasterizeSvg(svg));
     return { designId: `template-${input.postId}`, imageUrl };
+  }
+
+  private async logoHref(logoUrl?: string): Promise<string | undefined> {
+    if (!logoUrl) {
+      return undefined;
+    }
+    try {
+      const marker = '/media/';
+      const index = logoUrl.indexOf(marker);
+      const bytes =
+        index >= 0
+          ? await readFile(this.media.localPath(decodeURIComponent(logoUrl.slice(index + marker.length))))
+          : logoUrl.startsWith('https://')
+            ? await requestBuffer(logoUrl)
+            : undefined;
+      if (!bytes) {
+        return undefined;
+      }
+      const mime = bytes.subarray(0, 3).toString('hex') === 'ffd8ff' ? 'image/jpeg' : 'image/png';
+      return `data:${mime};base64,${bytes.toString('base64')}`;
+    } catch {
+      return undefined;
+    }
   }
 
   async createLocalPreview(input: {

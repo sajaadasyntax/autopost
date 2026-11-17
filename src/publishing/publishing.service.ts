@@ -28,15 +28,15 @@ export class PublishingService {
       return;
     }
     const target = await this.resolveTarget(post);
-    if (!target.fbPageId || !target.igUserId) {
-      throw new PermanentError('Facebook Page id or Instagram account id is missing on the brand.');
+    if (!target.fbPageId) {
+      throw new PermanentError('معرّف صفحة فيسبوك غير محفوظ.');
     }
     if (!post.imageUrl?.startsWith('https://') || !post.caption || !post.cta) {
-      throw new PermanentError('Publishing needs a caption and a public https image.');
+      throw new PermanentError('النشر يحتاج نصاً وصورة https عامة.');
     }
     const token = target.token;
     if (!token || token === UNCONFIGURED_PAGE_TOKEN) {
-      throw new PermanentError('Facebook Page token is not configured.');
+      throw new PermanentError('رمز صفحة فيسبوك غير محفوظ.');
     }
     const imageUrl = post.imageUrl;
     const caption = formatPostText({ caption: post.caption, hashtags: post.hashtags, cta: post.cta });
@@ -51,6 +51,9 @@ export class PublishingService {
       await this.posts.saveFbPostId(post.id, fbPostId);
     }
 
+    if (!target.igUserId) {
+      return;
+    }
     const fresh = await this.posts.findForPipeline(postId);
     if (!fresh?.imageUrl) {
       throw new PermanentError('Post not found.');

@@ -25,7 +25,23 @@ export type TemplateRect = {
   radius: number;
 };
 
-export type TemplateObject = TemplateText | TemplateRect;
+export type TemplateImage = {
+  type: 'image';
+  role: 'logo';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type TemplateObject = TemplateText | TemplateRect | TemplateImage;
+
+export type TemplateCopy = {
+  headline: string;
+  caption: string;
+  cta: string;
+  logoHref?: string;
+};
 
 export type TemplateDocument = {
   width: number;
@@ -43,13 +59,14 @@ export function blankTemplate(): TemplateDocument {
     background: '#111827',
     objects: [
       { type: 'rect', x: 72, y: 72, width: 936, height: 936, fill: '#ffffff', radius: 36 },
+      { type: 'image', role: 'logo', x: 780, y: 120, width: 180, height: 180 },
       {
         type: 'text',
         role: 'headline',
         text: 'العنوان',
         x: 120,
-        y: 200,
-        width: 840,
+        y: 150,
+        width: 620,
         fontSize: 64,
         fill: '#111827',
         fontWeight: '700',
@@ -60,7 +77,7 @@ export function blankTemplate(): TemplateDocument {
         role: 'caption',
         text: 'نص المنشور يظهر هنا',
         x: 120,
-        y: 340,
+        y: 400,
         width: 840,
         fontSize: 32,
         fill: '#374151',
@@ -101,11 +118,14 @@ export function parseTemplateDocument(value: unknown): TemplateDocument {
   };
 }
 
-export function renderTemplateSvg(
-  document: TemplateDocument,
-  copy: { headline: string; caption: string; cta: string },
-): string {
-  const parts = document.objects.map((object) => (object.type === 'rect' ? rectSvg(object) : textSvg(filled(object, copy))));
+export function renderTemplateSvg(document: TemplateDocument, copy: TemplateCopy): string {
+  const parts = [
+    ...document.objects.filter((object): object is TemplateRect => object.type === 'rect').map(rectSvg),
+    ...document.objects.filter((object): object is TemplateImage => object.type === 'image').map((object, index) => imageSvg(object, copy.logoHref, index)),
+    ...document.objects
+      .filter((object): object is TemplateText => object.type === 'text')
+      .map((object) => textSvg(filled(object, copy), document)),
+  ];
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${document.width}" height="${document.height}" viewBox="0 0 ${document.width} ${document.height}">
   <rect width="100%" height="100%" fill="${escapeXml(document.background)}"/>
@@ -124,24 +144,73 @@ function rectSvg(object: TemplateRect): string {
   return `<rect x="${object.x}" y="${object.y}" width="${object.width}" height="${object.height}" rx="${object.radius}" fill="${escapeXml(object.fill)}"/>`;
 }
 
-function textSvg(object: TemplateText): string {
-  const lines = wrap(object.text, object.fontSize, object.width);
+function imageSvg(object: TemplateImage, href: string | undefined, index: number): string {
+  const cx = object.x + object.width / 2;
+  const cy = object.y + object.height / 2;
+  const radius = Math.min(object.width, object.height) / 2;
+  if (!href) {
+    return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="#e5e7eb"/>`;
+  }
+  const id = `logo-${index}`;
+  return `<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${radius}"/></clipPath><image href="${escapeXml(href)}" x="${object.x}" y="${object.y}" width="${object.width}" height="${object.height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`;
+}
+
+function textSvg(object: TemplateText, document: TemplateDocument): string {
+  const fitted = fitText(object.text, object.fontSize, object.width, Math.max(object.fontSize * 1.2, nextBottom(document, object) - object.y));
   const anchor = object.align === 'center' ? 'middle' : object.align === 'left' ? 'start' : 'end';
   const x = object.align === 'center' ? object.x + object.width / 2 : object.align === 'left' ? object.x : object.x + object.width;
-  const tspans = lines
-    .map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : object.fontSize * 1.35}">${escapeXml(line)}</tspan>`)
+  const y = object.role === 'cta' ? ctaBaseline(object, document, fitted.fontSize, fitted.lines.length) : object.y + fitted.fontSize;
+  const tspans = fitted.lines
+    .map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : fitted.fontSize * 1.35}">${escapeXml(line)}</tspan>`)
     .join('');
-  return `<text x="${x}" y="${object.y + object.fontSize}" fill="${escapeXml(object.fill)}" font-family="Cairo, Tahoma, sans-serif" font-size="${object.fontSize}" font-weight="${object.fontWeight}" text-anchor="${anchor}">${tspans}</text>`;
+  return `<text x="${x}" y="${y}" fill="${escapeXml(object.fill)}" font-family="Cairo, Tahoma, sans-serif" font-size="${fitted.fontSize}" font-weight="${object.fontWeight}" text-anchor="${anchor}">${tspans}</text>`;
+}
+
+function nextBottom(document: TemplateDocument, object: TemplateText): number {
+  const below = document.objects
+    .filter((item) => item !== object && item.y >= object.y + 8 && overlaps(item, object))
+    .map((item) => item.y);
+  return below.length ? Math.min(...below) - 12 : document.height - 48;
+}
+
+function ctaBaseline(object: TemplateText, document: TemplateDocument, fontSize: number, lines: number): number {
+  const button = document.objects.find(
+    (item): item is TemplateRect =>
+      item.type === 'rect' && item.y <= object.y && item.y + item.height >= object.y && overlaps(item, object),
+  );
+  const block = Math.max(fontSize, lines * fontSize * 1.2);
+  if (!button) {
+    return object.y + fontSize;
+  }
+  return button.y + (button.height - block) / 2 + fontSize * 0.8;
+}
+
+function overlaps(a: { x: number; width: number }, b: { x: number; width: number }): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width;
+}
+
+function fitText(text: string, fontSize: number, width: number, maxHeight: number): { fontSize: number; lines: string[] } {
+  let size = fontSize;
+  let lines = wrap(text, size, width);
+  while (size > 18 && (blockHeight(lines, size) > maxHeight || lines.some((line) => estimateWidth(line, size) > width + 1))) {
+    size -= 2;
+    lines = wrap(text, size, width);
+  }
+  const maxLines = Math.max(1, Math.floor(maxHeight / (size * 1.35)));
+  return { fontSize: size, lines: lines.slice(0, maxLines) };
+}
+
+function blockHeight(lines: string[], fontSize: number): number {
+  return Math.max(fontSize, lines.length * fontSize * 1.35);
 }
 
 function wrap(text: string, fontSize: number, width: number): string[] {
-  const size = Math.max(8, Math.floor(width / (fontSize * 0.55)));
   const words = text.trim().split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = '';
   for (const word of words.length ? words : ['']) {
     const next = current ? `${current} ${word}` : word;
-    if (next.length > size && current) {
+    if (estimateWidth(next, fontSize) > width && current) {
       lines.push(current);
       current = word;
     } else {
@@ -149,11 +218,35 @@ function wrap(text: string, fontSize: number, width: number): string[] {
     }
   }
   if (current) lines.push(current);
-  return lines.slice(0, 8);
+  return lines;
+}
+
+function estimateWidth(text: string, fontSize: number): number {
+  let width = 0;
+  for (const char of text) {
+    if (char === ' ') {
+      width += fontSize * 0.28;
+    } else if (/[\u0600-\u06FF]/.test(char)) {
+      width += fontSize * 0.55;
+    } else {
+      width += fontSize * 0.52;
+    }
+  }
+  return width;
 }
 
 function parseObject(value: unknown): TemplateObject {
   const record = asRecord(value);
+  if (record.type === 'image' || record.role === 'logo') {
+    return {
+      type: 'image',
+      role: 'logo',
+      x: numberField(record.x, 0),
+      y: numberField(record.y, 0),
+      width: clamp(numberField(record.width, 160), 32, 800),
+      height: clamp(numberField(record.height, 160), 32, 800),
+    };
+  }
   if (record.type === 'rect') {
     return {
       type: 'rect',

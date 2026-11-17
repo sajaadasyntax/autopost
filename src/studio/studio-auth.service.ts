@@ -1,9 +1,11 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { normalizePhone } from '../common/phones';
 import { AppConfigService } from '../config/app-config.service';
 import { TokenCipher } from '../crypto/token-cipher.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { hashPassword, verifyPassword } from './password';
 import { loginCode, randomToken, tokenHash } from './tokens';
 
 const CODE_MS = 15 * 60 * 1000;
@@ -16,7 +18,31 @@ export class StudioAuthService {
     private readonly prisma: PrismaService,
     private readonly config: AppConfigService,
     private readonly cipher: TokenCipher,
+    private readonly whatsapp: WhatsappService,
   ) {}
+
+  async login(phoneInput: string, password: string): Promise<string> {
+    const phone = normalizePhone(phoneInput);
+    if (!phone || !this.config.env.allowlist.has(phone)) {
+      throw new ForbiddenException('هذا الرقم غير مسموح له بدخول الاستوديو.');
+    }
+    const secret = password.trim();
+    if (secret.length < 8) {
+      throw new BadRequestException('كلمة المرور يجب أن تكون ٨ أحرف على الأقل.');
+    }
+    const existing = await this.prisma.user.findUnique({ where: { phone } });
+    const user = existing ?? (await this.prisma.user.create({ data: { phone } }));
+    if (!user.passwordHash) {
+      await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(secret) } });
+      await this.whatsapp
+        .sendText(phone, 'تم حفظ كلمة مرور الاستوديو لهذا الرقم. أرسل «إلغاء كلمة المرور» في واتساب إذا لم تطلب ذلك.')
+        .catch(() => undefined);
+    } else if (!(await verifyPassword(secret, user.passwordHash))) {
+      throw new UnauthorizedException('رقم الهاتف أو كلمة المرور غير صحيحة.');
+    }
+    await this.ensureBrand(user.id);
+    return this.createSession(user.id);
+  }
 
   async requestCode(phoneInput: string): Promise<{ phone: string; code: string }> {
     const phone = normalizePhone(phoneInput);

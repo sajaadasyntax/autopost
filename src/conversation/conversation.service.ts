@@ -78,6 +78,11 @@ export class ConversationService {
       await this.whatsapp.sendText(user.phone, COPY.deleted);
       return;
     }
+    if (isPasswordReset(text)) {
+      await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash: null } });
+      await this.whatsapp.sendText(user.phone, `تم إلغاء كلمة المرور. افتح ${this.config.env.studioOrigin} واختر كلمة مرور جديدة.`);
+      return;
+    }
     if (isMenuRequest(text)) {
       await this.prisma.conversation.update({
         where: { userId: user.id },
@@ -468,6 +473,11 @@ export class ConversationService {
 function isDataDeletionRequest(text: string): boolean {
   const value = text.trim().toLowerCase().replace(/[.!]+$/g, '');
   return value === 'delete my data' || value === 'احذف بياناتي';
+}
+
+function isPasswordReset(text: string): boolean {
+  const value = text.trim().toLowerCase();
+  return value === 'إلغاء كلمة المرور' || value === 'reset password';
 }
 
 function isMenuRequest(text: string): boolean {

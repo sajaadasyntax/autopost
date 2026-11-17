@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const nest = process.env.NEST_API_URL || 'http://127.0.0.1:3010';
+const nest = process.env.NEST_API_URL || 'http://127.0.0.1:3000';
 
 async function proxy(request: NextRequest, path: string[]): Promise<NextResponse> {
   const target = `${nest}/studio/${path.join('/')}${request.nextUrl.search}`;

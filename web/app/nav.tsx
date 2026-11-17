@@ -19,7 +19,11 @@ export function Nav() {
     <aside className="sidebar">
       <p className="brand-mark">أوتو بوست</p>
       {links.map((link) => (
-        <Link key={link.href} href={link.href} className={pathname === link.href ? 'active' : ''}>
+        <Link
+          key={link.href}
+          href={link.href}
+          className={link.href === '/' ? (pathname === '/' ? 'active' : '') : pathname === link.href || pathname.startsWith(`${link.href}/`) ? 'active' : ''}
+        >
           {link.label}
         </Link>
       ))}

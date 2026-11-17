@@ -13,6 +13,7 @@ describe('template document', () => {
     expect(svg).toContain('عرض محدود على التبييض');
     expect(svg).toContain('احجز الآن');
     expect(svg).not.toContain('العنوان');
+    expect(svg.indexOf('#ea580c')).toBeGreaterThan(svg.indexOf('عرض محدود على التبييض'));
   });
 
   it('rejects a template that has no caption layer', () => {

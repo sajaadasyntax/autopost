@@ -119,13 +119,11 @@ export function parseTemplateDocument(value: unknown): TemplateDocument {
 }
 
 export function renderTemplateSvg(document: TemplateDocument, copy: TemplateCopy): string {
-  const parts = [
-    ...document.objects.filter((object): object is TemplateRect => object.type === 'rect').map(rectSvg),
-    ...document.objects.filter((object): object is TemplateImage => object.type === 'image').map((object, index) => imageSvg(object, copy.logoHref, index)),
-    ...document.objects
-      .filter((object): object is TemplateText => object.type === 'text')
-      .map((object) => textSvg(filled(object, copy), document)),
-  ];
+  const parts = document.objects.map((object, index) => {
+    if (object.type === 'rect') return rectSvg(object);
+    if (object.type === 'image') return imageSvg(object, copy.logoHref, index);
+    return textSvg(filled(object, copy), document);
+  });
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${document.width}" height="${document.height}" viewBox="0 0 ${document.width} ${document.height}">
   <rect width="100%" height="100%" fill="${escapeXml(document.background)}"/>
@@ -243,8 +241,8 @@ function parseObject(value: unknown): TemplateObject {
       role: 'logo',
       x: numberField(record.x, 0),
       y: numberField(record.y, 0),
-      width: clamp(numberField(record.width, 160), 32, 800),
-      height: clamp(numberField(record.height, 160), 32, 800),
+      width: clamp(numberField(record.width, 160), 16, 2000),
+      height: clamp(numberField(record.height, 160), 16, 2000),
     };
   }
   if (record.type === 'rect') {
@@ -255,7 +253,7 @@ function parseObject(value: unknown): TemplateObject {
       width: clamp(numberField(record.width, 100), 4, 2000),
       height: clamp(numberField(record.height, 100), 4, 2000),
       fill: colorField(record.fill, '#ffffff'),
-      radius: clamp(numberField(record.radius, 0), 0, 400),
+      radius: clamp(numberField(record.radius, 0), 0, 1000),
     };
   }
   const role = ROLES.has(record.role as TextRole) ? (record.role as TextRole) : 'static';
@@ -265,8 +263,8 @@ function parseObject(value: unknown): TemplateObject {
     text: stringField(record.text).slice(0, 500),
     x: numberField(record.x, 0),
     y: numberField(record.y, 0),
-    width: clamp(numberField(record.width, 400), 40, 2000),
-    fontSize: clamp(numberField(record.fontSize, 32), 12, 160),
+    width: clamp(numberField(record.width, 400), 20, 2000),
+    fontSize: clamp(numberField(record.fontSize, 32), 8, 320),
     fill: colorField(record.fill, '#111827'),
     fontWeight: record.fontWeight === '700' ? '700' : '400',
     align: record.align === 'center' || record.align === 'left' ? record.align : 'right',
